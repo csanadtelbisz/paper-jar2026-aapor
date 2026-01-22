@@ -1,0 +1,629 @@
+\documentclass[numbook]{svjour3}
+%
+\input{packages}
+\setcounter{secnumdepth}{4}
+\begin{document}
+%
+\title{Partial Order Reduction for Abstraction-based Verification of Concurrent Software}
+\titlerunning{Partial Order Reduction for Abstraction-based Verification}
+%\thanks{Supported by organization x.}}
+%
+\def\orcidID#1{\smash{\href{http://orcid.org/#1}{\protect\raisebox{-1.25pt}{\protect\includegraphics{ORCID_Color.eps}}}}}
+
+\author{
+	Csan\'ad~Telbisz~\orcidID{0000-0002-6260-5908} \and
+	Levente~Bajczi~\orcidID{0000-0002-6551-5860} \and
+	D\'aniel~Szekeres~\orcidID{0000-0002-2912-028X} \and
+	Andr\'as~V\"or\"os~\orcidID{0000-0001-7617-3563}
+}
+%
+\authorrunning{C. Telbisz et al.}
+% First names are abbreviated in the running head.
+% If there are more than two authors, 'et al.' is used.
+%
+\institute{
+	Department of Artificial Intelligence and Systems Engineering\\
+	Budapest University of Technology and Economics\\
+	Budapest, Hungary\\
+	\email{\{telbisz,bajczi,szekeres,vori\}@mit.bme.hu}
+%	\url{https://ftsrg.mit.bme.hu}
+}
+%
+\maketitle              % typeset the header of the contribution
+
+\begin{abstract}
+	TBA
+	\keywords{model checking \and concurrency \and partial order reduction \and abstraction}
+\end{abstract}
+
+\begin{footnotesize}
+	\paragraph*{\footnotesize{Funding.}}
+	% TODO update for camera-ready!
+	This research was partially funded by the EKÖP-25-3 New National Excellence Program under project number EKÖP-25-3-BME-22, and the Doctoral Excellence Fellowship Programme under project number DKÖP-23-1-BME-5; funded by the National Research Development and Innovation Fund of the Ministry of Culture and Innovation of Hungary.
+\end{footnotesize}
+
+
+\section{Introduction}
+\label{sec:intro}
+
+Partial order reduction (POR) is an effective technique for handling concurrency, and abstraction is an efficient approach to handling data in model checking. I present a general theoretical framework for combining these model checking paradigms where the advantages of using the two techniques simultaneously are also exploited. I also present a concrete verification algorithm using POR and abstraction together as a case study of my general approach. The novelty of my method lies in the general formulation of POR used during abstract state space exploration. Existing approaches combining these techniques are typically specific to POR or abstraction algorithms \cite{fbk_por_abstraction, impact_por_abstraction, abpress, sousa_abstractions_independence}. A general approach for combining abstraction and commutativity checking is proposed by \emph{Farzan et al.}~\cite{farzan_stratified_commutativity}. However, that paper does not investigate POR algorithms, simply the general properties of abstract commutativity relations. My work shows how the idea of abstract commutativity applies generally to POR in abstract state space exploration algorithms.
+
+The core concept of POR is to identify equivalent executions \cite{godefroid-thesis}. Then, it is enough to check a single representative from each equivalence class. Identifying equivalent interleavings is based on the interaction of threads: dependency is defined between the interacting program operations. Traditionally, a syntactic over-approximation is used as a method of calculating dependency for partial order reduction: two actions are independent if they do not use common shared variables (and the two actions belong to different processes)~\cite{godefroid-thesis}. For example, let us have a state in the (concrete) state space of the program with two enabled actions from different threads: \texttt{x++} and \texttt{y++}. No matter, in what order we explore the two actions (\texttt{x++}, \texttt{y++} or \texttt{y++}, \texttt{x++}), we will reach the same state since the actions operate on different variables. So we can skip the exploration of one of the two paths.
+
+When it comes to combining POR with abstraction, we face the problem that traditional approaches may calculate invalid dependency relations: it is not trivial to apply POR in an abstract state space where the values of variables are not tracked explicitly \cite{fbk_por_abstraction, sousa_abstractions_independence}. \Cref{example:por-traditional-dependency-wrong} shows a situation where syntactically independent actions are not commutative in an abstract state space.
+
+\begin{example}
+	\label{example:por-traditional-dependency-wrong}
+	Assume that we have an abstraction where we only track the predicates $x > y$ and $x > y + 1$ about our variables. \Cref{fig:por-noncommutativity} demonstrates that two actions that are independent in the traditional sense (no shared variable) may be dependent in the abstract state space. Actions \texttt{x++} and \texttt{y++} are dependent since they are not commutative in the abstract state space due to the difference in the labeling of the abstract states. Later, \Cref{fig:por-partially-infeasible} shows a case where actions with different variables can even disable each other.
+\end{example}
+
+Even though the syntactic over-approximation of dependency is not a valid dependency relation in the abstract state space, I show that using it for partial order reduction will always find an error state in the abstract state space if an error is reachable in the concrete state space. Furthermore, I restrict the calculation of dependency, to consider fewer actions dependent in an abstract state space. Intuitively, if the source of dependency between two actions is ignored due to abstraction, it is needless to consider these actions dependent. That is, two actions using the same shared variable are only considered dependent if we track any information about any of their shared variables in the abstraction. As a basic example, take the actions $x=0$ and $x=1$. Existing methods consider these actions dependent since they both write $x$. However, my approach allows considering these actions independent when we do not track any information about $x$ in the abstraction.
+
+\begin{figure}[t]
+	\centering
+	\includegraphics[width=70mm, keepaspectratio]{figures/noncommutativity.pdf}
+	\caption{Syntactically independent actions that are not commutative in the abstract state space}
+	\label{fig:por-noncommutativity}
+\end{figure}
+
+To further motivate my approach, it is possible to achieve exponential gains in terms of the number of explored interleavings by using my abstraction-based algorithm for partial order reduction. Consider the example from \Cref{fig:por-exponential-motivational-example} with $2N+1$ processes. The safety of the program can be proven with abstraction by only tracking the predicates $z \bmod 2 = 0$ and $x = 0$ about our variables. As $z \bmod 2 = 0$ is an invariant of the loop of $p_0$, $x$ will get the value $0$ which satisfies the assertion. To prove this, traditional methods would explore all interleavings of instructions using $y$ since these actions would be considered dependent due to $y$: processes $p_1 - p_{2N}$ have $2N!$ interleavings (potentially resulting in different values of $y$) not considering the loop of $p_0$; together there are even more possible interleavings. However, my algorithm notices that we do not track any information about $y$, so it will not consider the actions using $y$ dependent: this way, my method explores a single execution and guarantees the safety of the program.
+
+Summarizing my contributions: I introduce a general abstraction-based partial order reduction approach which is independent of both the underlying POR algorithm and the abstract domain and which uses the information coming from the abstraction to boost partial order reduction. By proving the correctness of using the new abstraction-based dependency relation, I also prove that using the traditional dependency relation for partial order reduction in an abstract state space is correct as well (which is also a non-trivial statement as testified by \Cref{example:por-traditional-dependency-wrong}). I have implemented and evaluated my method in the abstraction-based verification tool \Th \cite{theta}.
+
+The organization of this chapter is as follows. First, \Cref{sec:por-preliminaries} introduces the theoretical background. \Cref{sec:aapor} presents the novel general approach to combine POR and abstraction in an abstract state space exploration. \Cref{sec:aaspor} demonstrates an algorithm implementing abstraction-based POR. Finally, I evaluate the approach in \Cref{sec:por-experiments} using the algorithm introduced in \Cref{sec:aaspor}.
+
+\begin{figure}[t]
+	\centering
+	initially: \texttt{x:=y:=z:=0}
+	\vspace{0.3em}\\
+	\begin{subfigure}[t]{.25\textwidth}
+		\centering
+		Process $p_0$
+		
+		\begin{lstlisting}[language=python,basicstyle=\ttfamily,mathescape=true,backgroundcolor=\color{white},aboveskip=0.5em,frame=none]
+repeat N times:
+  z := z+2*y
+if z mod 2 = 0:
+  x := 0
+else:
+  x := 1
+		\end{lstlisting}
+	\end{subfigure}
+	\rulesep
+	\begin{subfigure}[t]{.25\textwidth}
+		\centering
+		Processes $p_1, ..., p_N$
+		\vspace{0.5em}\\
+		\texttt{y := y+1}
+		
+		\vspace{2em}
+		
+		Processes $p_{N+1}, ..., p_{2N}$
+		\vspace{0.5em}\\
+		\texttt{y := y*y}
+	\end{subfigure}\\
+	\vspace{0.3em}
+	finally: \texttt{assert(x*y=0)}
+	\caption{Motivational example for possible exponential gain}
+	\label{fig:por-exponential-motivational-example}
+\end{figure}\texttt{\texttt{}}
+
+
+\section{Preliminaries}
+\label{sec:por-preliminaries}
+
+We need to discuss some further preliminaries before we can dive into the contributions of this chapter. First, I introduce some extra notation used in this chapter, then I present the basic concept of partial order reduction.
+
+For the states $s_1, s_2$, and the set of variables $U \subseteq V$, I write \emph{$s_1 = s_2$ on $U$} to denote that $s_1(v) = s_2(v)$ for each $v \in U$. The notation $w \backslash t$ means the transition sequence obtained from $w$ by removing the first occurrence of $t$ from $w$.
+
+A transition system is action-deterministic if $|I| \le 1$ and $|\alpha(s)| \le 1$ for any state $s \in S$ and action $\alpha \in A$ \cite{principles-of-model-checking}. The state space of a program is not action-deterministic due to non-deterministic assignments, and uninitialized variables. However, \emph{unknown} is a possible value for variables when using abstraction (see details in \Cref{sec:abstraction}): an uninitialized variable or a variable after a non-deterministic assignment gets the specific value \emph{unknown}. This way, the state space becomes action-deterministic. In an action-deterministic transition system, I use $\alpha(s)$ for the single state $s'$ with $(s, \alpha, s') \in T$. Partial order reduction algorithms are classically formulated for action-deterministic transition systems~\cite{dpor,principles-of-model-checking,baelde-action-deterministic}. In some cases, instead of using the term action-deterministic, it is said that control non-determinism is allowed \cite{source_set_foundation}. Some works investigate partial order reduction algorithms in non-deterministic state spaces, also considering types of abstraction introducing non-determinism \cite{hansen_abstractions_por_nondet}. In those settings, partial order reduction algorithms need to satisfy different properties. However, this research direction is out of this work's scope, so I assume that the abstract state space is action-deterministic.
+
+A further assumption that we need for the algorithms in this chapter is that the state space is finite. For data variables, this is not a real restriction in most cases, as the domain of program variables are typically bounded (e.g., 32-bit integers in most languages) or abstraction can take care of a finite domain (e.g., the size of the domains of each predicate in predicate abstraction is 2). The restriction concerns concurrent programs where new threads are created dynamically in an infinite loop. Naturally, in real scenarios, we do not need an unbounded number of threads (and in fact, the limitations of the execution environment also limits the possible number of running threads at the same time), so this is also only a theoretical limitation. Besides, it is a common assumption to take in the papers presenting partial order reduction algorithms~\cite{source_persistent, valmari_stubborn, godefroid-thesis}.
+
+\subsection{Partial Order Reduction}
+
+Partial Order Reduction (POR) is a well-known technique for avoiding the exploration of redundant thread interleavings in the verification of a multi-threaded program \cite{godefroid-thesis}. Its key idea is to define an equivalence relation on traces and explore a single representative (or as few as possible) from each equivalence class. Traces are defined to be equivalent if they can be obtained from each other by successively swapping adjacent \emph{independent} actions. An equivalence class is called a \emph{Mazurkiewicz trace} \cite{mazurkiewicz_trace}. Intuitively, if adjacent independent actions are swapped, the outcome will remain the same: by exploring a single trace from each equivalence class, we still cover all behaviors of the system. For the above interpretation of equivalence, we need a definition of independence.
+
+Dependency plays a key role in partial order reduction. The general formulation of dependency is as follows~\cite{godefroid-thesis}:
+
+\begin{definition}[Valid Dependency Relation]
+	Let ${TS} = (S, A, T, I)$ be an action-deterministic transition system. Let $D \subseteq A \times A$ be a binary, reflexive, and symmetric relation. $D$ is a \emph{valid dependency relation} if for all $\alpha, \beta \in A$, $(\alpha, \beta) \notin D$ ($\alpha$ and $\beta$ are \emph{independent}) implies that the following two conditions hold for all $s \in S$:
+	\begin{itemize}
+		\item if $\alpha \in {enabled}(s)$, then $\beta \in {enabled}(s)$ iff $\beta \in {enabled}(\alpha(s))$, \emph{and}
+		\item if $\alpha, \beta \in {enabled}(s)$, then $\beta(\alpha(s)) = \alpha(\beta(s))$.
+	\end{itemize}
+	
+	$\alpha$ and $\beta$ are \emph{dependent} if they are not independent.
+\end{definition}
+
+The first condition means that independent actions can neither disable nor enable each other. The second property states that independent actions commute. Sometimes, \emph{dependency of transitions} is used in this paper: by the dependency of transitions, I mean dependency of their actions. Note that I will introduce relations in this work that are not \emph{valid} dependency relations; however, for semantic reasons, I will refer to them as dependency relations - without the label \emph{valid}.
+
+Since the goal of POR is to avoid exploring multiple traces leading to the same state, the definition cannot be used directly for determining dependency (two actions should be explored in both orders to decide whether they commute). An appropriate approximation of the dependency relation in an abstract state space is a main contribution of this work.
+
+Many algorithms have been introduced for partial order reduction in the last decades. My abstraction-based extension is orthogonal to the underlying POR algorithm. In this work, I build my presentation on the concept of source sets which is the core of optimal dynamic partial order reduction \cite{optimal_dpor}.
+
+\section{Abstraction-Aware Partial Order Reduction}
+\label{sec:aapor}
+
+This chapter describes how partial order reduction can be integrated into an abstraction-based model checking algorithm. Since the core concept of the approach is to consider extra information about the used abstraction when applying partial order reduction, I call the algorithm \emph{abstraction-aware partial order reduction}. My approach is independent of the underlying POR algorithm as well as the applied abstract domain. The only requirements are that CFA locations of all processes must be explicitly tracked, and the abstract state space must be action-deterministic, that is the transfer function must return a single successor for each state and operation.
+
+\subsection{Dependency relations}
+
+In my algorithms, different dependency relations are used for partial order reduction. It is important to note that these are not necessarily valid dependency relations in all transition systems. First, I define the syntactic dependency relation.
+
+\subsubsection{Syntactic Dependency Relation}
+
+A syntactic dependency relation denoted by $D_S$ is the classically used syntactic over-approximation of dependency\cite{godefroid-thesis}. That is, two actions $(\alpha, \beta) \in D_S$ ($\alpha$ and $\beta$ are dependent) iff:
+
+\begin{itemize}
+	\item $\alpha$ and $\beta$ are actions of the same process, \emph{or}
+	\item ${vars}(\alpha) \cap {vars}(\beta) \ne \emptyset$, and at least one variable in ${vars}(\alpha) \cap {vars}(\beta)$ is written by $\alpha$ or $\beta$.
+\end{itemize}
+
+The syntactic dependency relation is a valid dependency relation in the concrete state space \cite{godefroid-thesis}. However, in general, it is not a valid dependency relation in the abstract state space; see the motivating example \Cref{example:por-traditional-dependency-wrong}.
+
+\subsubsection{Abstraction-Based Dependency Relation}
+
+I introduce a new dependency relation for abstract state spaces (similar conditions are proposed in \cite{farzan_stratified_commutativity}). An abstraction-based dependency relation $D_\Pi$ is also a syntactic approximation. However, it is defined in an abstraction with respect to the precision of the abstraction.
+
+\begin{definition}
+	Let us have an abstract state space built with precision $\Pi$, and let $D_\Pi$ be a binary, reflexive, and symmetric relation. Two actions $(\alpha, \beta) \in D_\Pi$ ($\alpha$ and $\beta$ are dependent with respect to precision $\Pi$) iff:
+	\begin{itemize}
+		\item $\alpha$ and $\beta$ are actions of the same process, \emph{or}
+		\item ${vars}(\alpha) \cap {vars}(\beta) \cap {vars}(\Pi) \ne \emptyset$, and at least one variable in ${vars}(\alpha) \cap {vars}(\beta) \cap {vars}(\Pi)$ is written by $\alpha$ or $\beta$.
+	\end{itemize}
+\end{definition}
+
+In other words, the second condition means that $\alpha$ and $\beta$ may still be independent if they use common variables. They are only dependent when the abstraction stores any information about any variable that they both access. Note that $D_\Pi$ is a subset of the syntactic dependency relation $D_S$ for any precision $\Pi$: the first condition is the same for both relations, and the second condition of $D_\Pi$ implies the second condition of $D_S$. As a consequence, $D_\Pi$ is not a valid dependency relation in the abstract state space either (same counterexample from \Cref{example:por-traditional-dependency-wrong}). Furthermore, $D_\Pi$ is not necessarily a valid dependency relation in the concrete state space.
+
+\begin{example}
+	To illustrate the difference between the syntactic and the abstraction-based dependency relation, consider the actions \texttt{x=1} and \texttt{[x>0]}. They are dependent based on the syntactic dependency relation since they both use the variable $x$, and the first action writes it. For the abstraction-based dependency relation, we need an abstraction with a precision. First, let the precision be $\Pi = \{x < y\text{, }z = 1\}$: then the two actions are dependent in $D_\Pi$ since we have information about $x$ in this abstraction. However, when the precision is $\Pi = \{0 < y\text{, }z = 1\}$, then our actions are independent in $D_\Pi$ as the value of $x$ is completely ignored in this abstraction.
+\end{example}
+
+As we have seen, the introduced relations are not valid dependency relations. However, I show in the next sections that using these relations ($D_\Pi$ in particular) for partial order reduction in an abstract state space with precision $\Pi$, feasible errors are still found.
+
+
+\subsection{Partial Feasibility}
+
+First, I generalize the concept of abstract trace feasibility by introducing partial feasibility. Intuitively, a partial concretization of an abstract trace is a partial variable assignment for each abstract state of the trace with only a subset of variables assigned so that the partial variable assignment does not contradict the abstract state expressions. The motivation for introducing partial feasibility is that variables ignored in the abstraction may spoil feasibility. 
+
+\begin{example}
+	Let us have a program with the following three independent actions (with the variables being initially zero):
+	
+	$\alpha$: \texttt{x=1 \rulesep}
+	$\beta$: \texttt{[y=0] reach error \rulesep}
+	$\gamma$: \texttt{[z=1] z=0}
+	
+	Clearly, $\gamma$ is not enabled in the initial concrete state due to $z$ being zero. Let us have the abstraction where only the variables $x$ and $y$ are tracked explicitly. Now, $\gamma$ is enabled in the abstract initial state as we have no information about $z$. A partial order reduction algorithm may explore the trace $w = \gamma.\alpha.\beta$ and no other traces as all actions are independent. Even though $w$ is not feasible, it will be enough for us in a sense that is formalized by partial feasibility.
+\end{example}
+
+\begin{figure}[t]
+	\centering
+	\includegraphics[width=.7\textwidth, keepaspectratio]{figures/partial-concretization.pdf}
+	\caption{Abstract trace with a partial concretization}
+	\label{fig:por-partial-concretization}
+\end{figure}
+
+\begin{definition}
+	\label{def:por-partial-feasibility}
+	An abstract trace $w = \alpha_1...\alpha_k$ from an abstract state $s_0$ ($s_0 \xrightarrow{\alpha_1} ... \xrightarrow{\alpha_k} s_k$) is \emph{partially feasible} for the set of variables $P \subseteq V$ if there are concrete states $c_0, ..., c_k$ such that:
+	\begin{itemize}
+		\item $c_i \models s_i$ for each $0 \le i \le k$, and
+		\item for each $0 \le i < k$, $\exists c_{i+1}'$ such that $c_i \xrightarrow{\alpha_{i+1}} c_{i+1}'$, $c_{i+1}'(p) = c_{i+1}(p)$ for each process $p$, and $c_{i+1}' = c_{i+1}$ on $P$.
+	\end{itemize}
+	We refer to $c_0, ..., c_k$ as a \emph{partial concretization} of $w$ for $P$.
+\end{definition}
+
+If $w$ consists of a single action $\alpha$, I say that $\alpha$ is a partially feasible action from the abstract state. Note that $w$ being partially feasible for $V$ means that $w$ is feasible. The connection between feasibility and partial feasibility is straightforward: if $w$ is not partially feasible for a $P \subseteq V$, then $w$ is not feasible; and if $w$ is feasible, then $w$ is partially feasible for any $P \subseteq V$. In practice, I will use $P = {vars}(\Pi)$ for a precision $\Pi$: thus, partial feasibility will only depend on variables that we have information about in the current abstraction.
+
+\begin{example}
+	\label{example:por-partial-concretization}
+	\Cref{fig:por-partial-concretization} illustrates partial feasibility: we have the abstract trace $\alpha_1...\alpha_k$ from the abstract state $s_0$ and it has a partial concretization $c_0, ..., c_k$ (for the sake of simplicity, I omitted the values of variables from the figure).
+	
+	We can see an example of an abstract trace that is not partially feasible for $\{x, y\}$ in \Cref{fig:por-partially-infeasible}. The figure shows an abstract state space built with a precision consisting of the predicates $x+y \le 2$ and $y \ge 2$. The state expression of the initial state is \emph{true}, and it remains \emph{true} even after executing $x = 0$ since none of the predicates or their negated form is a consequence of this action. However, $y = 2 - x$ implies $x+y \le 2$. It still allows both $[x \ge 2]$ and $[y \ge 2]$ to be enabled. Even though $x = 0$, $y = 2 - x$, $[x \ge 2]$ is an abstract trace from the initial state, it is trivially not partially feasible since there is no possible partial variable assignment for ${vars}(\Pi) = \{x, y\}$ meeting the requirements of \Cref{def:por-partial-feasibility} due to $x$. Also note that the actions $[x \ge 2]$ and $[y \ge 2]$ (belonging to different processes) disable each other even though they are independent based on the syntactic dependency relation.
+\end{example}
+
+\begin{figure}[t]
+	\centering
+	\includegraphics[width=.7\textwidth, keepaspectratio]{figures/disabling.pdf}
+	\caption{Example of a partially infeasible abstract trace}
+	\label{fig:por-partially-infeasible}
+\end{figure}
+
+The following lemma states that if we have a sequence of concrete states $c_0, ..., c_k$ that satisfy the conditions in \Cref{def:por-partial-feasibility}, then there is indeed an abstract trace in the abstract state space whose partial concretization is the sequence $c_0, ..., c_k$.
+
+\begin{lemma}
+	\label{lemma:por-concretization-to-trace}
+	Let $\Pi$ be the precision of the abstraction and $P = {vars}(\Pi)$; and $c_0, ..., c_k$ be concrete states such that for each $0 \le i < k$, $\exists c_{i+1}'$ with $c_i \xrightarrow{\alpha_{i+1}} c_{i+1}'$, $c_{i+1}'(p) = c_{i+1}(p)$ for each process $p$, and $c_{i+1}' = c_{i+1}$ on $P$. Let $s_0$ be any abstract state with $c_0 \models s_0$. Then: $\alpha_1...\alpha_k$ is an abstract trace that exists in the abstract state space from $s_0$.
+\end{lemma}
+
+\begin{proof}
+	The abstract state space being an over-approximation of the concrete state space means that if there is a transition $c_i \xrightarrow{\alpha_{i+1}} c_{i+1}'$ in the concrete state space, then there is a transition $s_i \xrightarrow{\alpha_{i+1}} s_{i+1}$ in the abstract state space where $c_i \models s_i$ and $c_{i+1}' \models s_{i+1}$. The expression function of abstract states only uses the variables in the precision. Thus, from $c_{i+1}'(p) = c_{i+1}(p)$ for each process $p$, and $c_{i+1}' = c_{i+1}$ on $P$, it follows that $c_{i+1}' \models s_{i+1}$ implies that $c_{i+1} \models s_{i+1}$. Now, with induction for $i$ from 0 to $k-1$, we get that $\alpha_1...\alpha_k$ is an abstract trace in the abstract state space from $s_0$.
+\end{proof}
+
+
+\subsection{Relaxed Partial Order Representation}
+
+We can connect the partial order representation defined by a dependency relation with partial feasibility. Let $w_1 \approx^\Pi w_2$ denote that abstract traces $w_1$ and $w_2$ can be transformed into each other by successively swapping adjacent actions that are independent in $D_\Pi$. Thus, the relation $\approx^\Pi$ defines equivalence classes (Mazurkiewicz traces \cite{mazurkiewicz_trace}) on abstract traces. The following theorem states that either all abstract traces are partially feasible in such an equivalence class or none.
+
+\begin{theorem}
+	\label{theorem:por-partial-feasibility-equivalence}
+	Let us have an abstract state space $S$ built with precision $\Pi$, let $s \in S$ be an abstract state, $w_1$ and $w_2$ be transition sequences with $w_1 \approx^\Pi w_2$, and $P = {vars}(\Pi)$.
+	
+	Then, $w_1$ is a partially feasible abstract trace from $s$ for $P$ iff $w_2$ is a partially feasible abstract trace from $s$ for $P$.
+\end{theorem}
+
+\begin{proof}
+	I prove that swapping two adjacent actions independent based on $D_\Pi$ in a partially feasible abstract trace $w$ will result in an abstract trace $w'$ that is also partially feasible. The case is symmetric for $w_1$ and $w_2$: I can assume that $w_1$ is partially feasible. Since $w_1 \approx^\Pi w_2$ means that the partially feasible abstract trace $w_1$ can be transformed into $w_2$ by successively swapping adjacent independent actions, and partial feasibility is preserved in each step, it follows that $w_2$ is partially feasible.
+	
+	Let $w = q.\alpha.\beta.r$ for some traces $q$ and $r$ ($s \xrightarrow{q} s_q \xrightarrow{\alpha} s_\alpha \xrightarrow{\beta} s_{\alpha\beta} \xrightarrow{r} s_w$) and $w' = q.\beta.\alpha.r$ from state $s$ with $w$ being partially feasible from $s$ for $P$, and $(\alpha, \beta) \notin D_\Pi$. I check that $w'$ is also partially feasible from $s$ for $P$. Let $A = {vars}(\alpha)$, and $B = {vars}(\beta)$.
+	
+	Since $w$ is partially feasible, we have a partial concretization $c, ..., c_q, c_\alpha, c_{\alpha\beta}, ..., c_w$ of $w$ with $c_q \models s_q$, $c_\alpha \models s_\alpha$, $c_{\alpha\beta} \models s_{\alpha\beta}$. Ignoring the end of $w$, we get that $c, ..., c_q, c_\alpha, c_{\alpha\beta}$ is a partial concretization of $q.\alpha.\beta$ for $P$. My goal is to show that there is a partial concretization $c, ..., c_q', c_\beta, c_{\beta\alpha}$ of $q.\beta.\alpha$ such that $c_{\alpha\beta} = c_{\beta\alpha}$.
+	
+	Throughout the proof, I will compare the values of variables in different concrete states. For this, as a reference, let us make the following observations:
+	
+	\begin{observation}
+		\label{por-observation1}
+		Since $(\alpha, \beta) \notin D_\Pi$, $A \cap B \cap P = \emptyset$ or neither $\alpha$ nor $\beta$ modifies any variable in $A \cap B \cap P$. In both cases, $c_1(v) = c_2(v)$ for each variable $v \in A \cap B \cap P$ for any concrete states $c_1$, $c_2$ with $c_1 \xrightarrow{\alpha} c_2$ or $c_1 \xrightarrow{\beta} c_2$.
+	\end{observation}
+	
+	\begin{observation}
+		\label{por-observation2}
+		The action $\alpha$ can only change the values of variables in $A$, so if we have concrete states $c_1$ and $c_2$ with $c_1 \xrightarrow{\alpha} c_2$, then $c_1 = c_2$ on $\overline{A}$. Similarly for $\beta$.
+	\end{observation}
+	
+	\definecolor{c0}{HTML}{ffffff}
+	\definecolor{c1}{HTML}{000000}
+	\definecolor{c2}{HTML}{ff8585}
+	\definecolor{c3}{HTML}{5fd851}
+	\definecolor{c4}{HTML}{51c0d8}
+	\definecolor{c5}{HTML}{ff7300}
+	\definecolor{c6}{HTML}{ff1bf7}
+	\definecolor{c7}{HTML}{ffea00}
+	\definecolor{c8}{HTML}{133c9a}
+	\definecolor{c9}{HTML}{008024}
+	\definecolor{c10}{HTML}{ffe19f}
+	\definecolor{c11}{HTML}{cddbde}
+	\definecolor{c12}{HTML}{ff0000}
+	\definecolor{c13}{HTML}{770079}
+	\definecolor{c14}{HTML}{9fd5ac}
+	\definecolor{c15}{HTML}{a8ff00}
+	\definecolor{c16}{HTML}{ca3aff}
+	\definecolor{c17}{HTML}{6e5000}
+	\definecolor{c18}{HTML}{00ffa8}
+	\definecolor{c19}{HTML}{f2f2f2}
+	\definecolor{lightborder}{HTML}{555555}
+	\newcommand{\cbox}[1]{%
+		\def\bc{white}%
+		\def\br{1.5pt}%
+		\IfEqCase{#1}{%
+			{0}{\def\bg{c0}\def\tc{black}\def\bc{lightborder}\def\br{0.5pt}}%
+			{1}{\def\bg{c1}\def\tc{white}}%
+			{2}{\def\bg{c2}\def\tc{black}}%
+			{3}{\def\bg{c3}\def\tc{black}}%
+			{4}{\def\bg{c4}\def\tc{black}}%
+			{5}{\def\bg{c5}\def\tc{black}}%
+			{6}{\def\bg{c6}\def\tc{black}}%
+			{7}{\def\bg{c7}\def\tc{black}}%
+			{8}{\def\bg{c8}\def\tc{white}}%
+			{9}{\def\bg{c9}\def\tc{white}}%
+			{10}{\def\bg{c10}\def\tc{black}}%
+			{11}{\def\bg{c11}\def\tc{black}}%
+			{12}{\def\bg{c12}\def\tc{white}}%
+			{13}{\def\bg{c13}\def\tc{white}}%
+			{14}{\def\bg{c14}\def\tc{black}}%
+			{15}{\def\bg{c15}\def\tc{black}}%
+			{16}{\def\bg{c16}\def\tc{black}}%
+			{17}{\def\bg{c17}\def\tc{white}}%
+			{18}{\def\bg{c18}\def\tc{black}}%
+			{19}{\def\bg{c19}\def\tc{black}\def\bc{lightborder}\def\br{0.5pt}}%
+		}%
+		\tcbox[colback=\bg,fontupper=\color{\tc},colframe=\bc,boxrule=\br]{#1}%
+	}%
+	
+	In \Cref{fig:por-partial-feasibility-equivalence-colors}, I visualize the concrete and abstract states appearing in the proof. The variable values are represented by Venn diagrams in each concrete state. Sets with the same colors (and numbers) indicate that variables belonging to them have the same values. The colored numbers in the text should be interpreted such that the set of variables mentioned just before the colored numbers is the union of sets represented by the numbers.
+	
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=.8\textwidth, keepaspectratio]{figures/n-color-theorem.pdf}
+		\caption{Variables of states in the proof of \Cref{theorem:por-partial-feasibility-equivalence}.}
+		\label{fig:por-partial-feasibility-equivalence-colors}
+	\end{figure}
+	
+	Using \Cref{def:por-partial-feasibility} of partial feasibility for the partial concretization $c, ..., c_q, c_\alpha, c_{\alpha\beta}$: there is a concrete state $c_\alpha'$ such that $c_q \xrightarrow{\alpha} c_\alpha'$ and $c_\alpha' = c_\alpha$ on $P$ \cbox{1}\cbox{2}\cbox{4}\cbox{10}; similarly, there is a concrete state $c_{\alpha\beta}'$ such that $c_\alpha \xrightarrow{\beta} c_{\alpha\beta}'$ and $c_{\alpha\beta}' = c_{\alpha\beta}$ on $P$ \cbox{1}\cbox{2}\cbox{10}\cbox{13}.
+	
+	Based on \Cref{por-observation2} for $\alpha$, $c_q = c_\alpha'$ on $\overline{A}$ \cbox{0}\cbox{2}\cbox{4}\cbox{7}. Putting it together, $c_q = c_\alpha$ on $P \setminus A$ \cbox{2}\cbox{4}. Let $c_q'$ such that $c_q'(p) = c_q(p)$ for each process $p$\footnote{For better readability, I will omit CFA locations from now on. Based on the notations, all states with the same name differing only in an apostrophe have the same CFA locations for each process.}, and $c_q' = c_q$ on $\overline{B} \cup P$ \cbox{0}\cbox{1}\cbox{2}\cbox{3}\cbox{4}\cbox{5}. Also, let $c_q' = c_\alpha$ on $B \setminus P$ \cbox{8}\cbox{9}. Defining $c_q'$ this way, with \Cref{por-observation1} we can conclude that $c_q' = c_\alpha$ on $B$ \cbox{1}\cbox{4}\cbox{8}\cbox{9}.
+	
+	From partial feasibility we know that $\beta$ is enabled in $c_\alpha$. The guard condition of $\beta$ only depends on the values of variables in $B$. Therefore, by the fact that $c_q' = c_\alpha$ on $B$, $\beta$ is enabled in $c_q'$: there is a concrete state $c_\beta'$ with $c_q' \xrightarrow{\beta} c_\beta'$.
+	
+	Let $c_\beta$ be a concrete state with $c_\beta = c_\beta'$ on $\overline{A} \cup P$ \cbox{0}\cbox{1}\cbox{2}\cbox{3}\cbox{13}\cbox{14}. Also, let $c_\beta = c_q$ on $A \setminus P$ \cbox{5}\cbox{6}. Using the definitions of $c_\beta$ and $c_q'$, and \Cref{por-observation2} for $\beta$: $c_\beta = c_\beta' = c_q' = c_q$ on $(A \cap P) \setminus B$ \cbox{3}. By the definition of $c_\beta$ and \Cref{por-observation1}, $c_\beta = c_q$ on $A$ \cbox{1}\cbox{3}\cbox{5}\cbox{6}. This way, the fact that $\alpha \in {enabled}(c_q)$ implies that $\alpha$ is enabled in $c_\beta$.
+	
+	Now let $c_{\beta\alpha}'$ be such that $c_\beta \xrightarrow{\alpha} c_{\beta\alpha}'$. Let $c_{\beta\alpha}$ be such that $c_{\beta\alpha} = c_{\beta\alpha}'$ on $P$ \cbox{1}\cbox{2}\cbox{10}\cbox{13}. Also, let $c_{\beta\alpha} = c_{\alpha\beta}$ on $\overline{P}$ \cbox{16}\cbox{17}\cbox{18}\cbox{19}. I show that $c_{\beta\alpha} = c_{\alpha\beta}$ even on $P$ \cbox{1}\cbox{2}\cbox{10}\cbox{13}.
+	
+	Again, consider that $c_q = c_\beta$ on $A$ \cbox{1}\cbox{3}\cbox{5}\cbox{6}, thus $\alpha$ from $c_q$ and $c_\beta$ will result in the same new values for $v \in A$: $c_\alpha' = c_{\beta\alpha}'$ on $A$ \cbox{1}\cbox{10}\cbox{11}\cbox{12}. From \Cref{por-observation2} for $\beta$, and the definitions of the following states, $c_{\alpha\beta} = c_{\alpha\beta}' = c_\alpha = c_\alpha' = c_{\beta\alpha}' = c_{\beta\alpha}$ on $A \cap P$ \cbox{1}\cbox{10}. Symmetrically, $c_{\alpha\beta} = c_{\alpha\beta}' = c_\beta' = c_\beta = c_{\beta\alpha}' = c_{\beta\alpha}$ on $B \cap P$ \cbox{1}\cbox{13}. Finally, $c_{\beta\alpha} = c_q = c_{\alpha\beta}$ on $P \setminus (A \cup B)$, since neither $\alpha$, $\beta$, nor the definition of any concrete state changed the value of such a variable $v$ \cbox{2}.
+	
+	Thus, $c_{\beta\alpha} = c_{\alpha\beta}$ on $V$ (all variables). It can be easily seen that process locations are the same in $c_{\beta\alpha}$ and $c_{\alpha\beta}$, so $c_{\beta\alpha} = c_{\alpha\beta}$. Based on the above definitions of $c_\beta$ and $c_{\beta\alpha}$, the above proven property that $c_{\beta\alpha} = c_{\alpha\beta}$, and using \Cref{lemma:por-concretization-to-trace} for the sequence of concrete states $c, ..., c_q, c_\beta, c_{\beta\alpha}, ..., c_w$, we get that $w' = q.\beta.\alpha.r$ is a partially feasible abstract trace for $P$ from the abstract state $s$ which proves the theorem.
+\end{proof}
+
+Also, take the following lemma which states that a partially feasible trace $w$ can be extended to a partially feasible trace with an action that is enabled in the first concrete state of any partial concretization of $w$; it will be useful later.
+
+\begin{lemma}
+	\label{lemma:por-independence-non-disabling}
+	Let $\Pi$ be the precision of the abstraction, $s$ be an abstract state, and let the trace $w = w_1...w_n$ be a partially feasible trace from $s$ for ${vars}(\Pi)$. Let $c_0,...,c_n$ be a partial concretization of $w$ from $s$, and let $\alpha \in {enabled}(c_0)$ such that $(\alpha, w_i) \notin D_\Pi$ for each $1 \le i \le n$. Then, $w.\alpha$ is also a partially feasible trace from $s$ for ${vars}(\Pi)$.
+\end{lemma}
+
+\begin{proof}
+	Throughout the proof, $1 \le i \le n$ and $0 \le j \le n$. Let $W = \bigcup_i {vars}(w_i)$, that is, the variables used by any action of $w$; and let $c_\alpha = \alpha(c_0)$.
+	
+	I define the concrete states $c_j'$ such that $c_j' = c_\alpha$ on ${vars}(\alpha) \setminus W$, and $c_j'(v) = c_j(v)$ otherwise. As for the CFA locations, $c_j'(p) = c_j(p)$ for each process $p \ne p_\alpha$, and $c_j'(p_\alpha) = c_\alpha(p_\alpha)$.
+	
+	It can be easily checked that the conditions of \Cref{lemma:por-concretization-to-trace} are met by the concrete states $c_0, c_0', ..., c_n'$. For $c_0$ and $c_0'$, there is $c_\alpha$ with $c_0 \xrightarrow{\alpha} c_\alpha$, and $c_\alpha = c_0'$ on ${vars}(\Pi)$ (see the definitions of these states and \Cref{por-observation1} for $\alpha$ and $w_i$). From $c_0'$, the conditions are met because $c_0, ..., c_n$ is a partial concretization of $w$ for ${vars}(\Pi)$, and $c_j' = c_j$ on $W$, and $c_j'(p_{w_i}) = c_j(p_{w_i})$ for each process $p_{w_i}$ (as $p_\alpha \ne p_{w_i}$ based on $(\alpha, w_i) \notin D_\Pi$).
+	
+	Then, by \Cref{lemma:por-concretization-to-trace}, the trace $\alpha.w$ is partially feasible from $s$ for ${vars}(\Pi)$ with the partial concretization $c_0, c_0', ..., c_n'$. Since $(\alpha, w_i) \notin D_\Pi$, $\alpha.w \approx^\Pi w.\alpha$ which implies by \Cref{theorem:por-partial-feasibility-equivalence} that $w.\alpha$ is partially feasible from $s$ for ${vars}(\Pi)$.
+\end{proof}
+
+So far, I have defined equivalence classes on abstract traces with the relation $D_\Pi$. Evidently, if a partially feasible abstract trace reaches an error state, then all other traces in its equivalence class reach an error state. It comes from the fact that error states are defined as states where any process is in an error location. Since all traces of an equivalence class contain the same actions (cf. they can be obtained from each other by successively swapping certain actions), if an action leads to an error location, it will reach the error in all traces regardless of the order of actions.
+
+\subsection{Source Sets for Abstraction-Aware Partial Order Reduction}
+
+We need an algorithm that explores only a single trace (or as few as possible) per equivalence class. Any POR algorithm could be chosen from the literature. Since I strive for generality, I use the concept of source sets \cite{source_set_foundation} as necessary conditions on the correctness of a POR algorithm can be formulated with source sets \cite{source_persistent}. I slightly modify its formulation to demonstrate that using the abstraction-based (or the traditional) dependency relation for partial order reduction in the abstract state space yields correct results.
+
+Using the relation $\approx^\Pi$ on abstract traces, I relax the definition of \emph{weak initials} and \emph{source sets} from \cite{source_set_foundation}:
+
+\begin{definition}[Weak Initials]
+	\label{def:por-weak-initials}
+	Let $s$ be an abstract state, $\Pi$ be the precision of the abstraction, and $w$ be a transition sequence from $s$ such that $w$ is partially feasible from $s$ for ${vars}(\Pi)$. For $w$, the set $\mathit{WI}_s^\Pi(w)$ of weak initials in $s$ is a set of actions: $\alpha \in \mathit{WI}_s^\Pi(w)$ iff there are transition sequences $v_1$ and $v_2$ such that $\alpha.v_1 \approx^\Pi w.v_2$, and $w.v_2$ is partially feasible from $s$ for ${vars}(\Pi)$.
+\end{definition}
+
+\begin{definition}[Source Sets]
+	Let $s$ be a state, and $W$ be a set of transition sequences such that $w$ is an abstract trace from $s$ for each $w \in W$. A set $P \subseteq \mathit{enabled}(s)$ is a \emph{source set for $W$ in $s$} if for each transition sequence $w \in W$, $\mathit{WI}_s^\Pi(w) \cap P \ne \emptyset$.
+\end{definition}
+
+For abstract traces $w$ and $w'$ from the abstract state $s$, I use $w \sqsubseteq_{s} w'$ to denote that $w.v \approx^\Pi w'$ for some transition sequence $v$.
+
+\begin{example}
+	To demonstrate weak initials and source sets, take the program of \Cref{fig:por-exponential-motivational-example}, and let $s_0$ be the abstract initial state. Consider two precisions $\Pi_1$ and $\Pi_2$. In the first case, let us explicitly track all variables of the program, so $\mathit{vars}(\Pi_1) = \{x, y, z\}$. In the other case, let us only track the predicates $z \bmod 2 = 0$ and $x = 0$, so $\mathit{vars}(\Pi_2) = \{x, z\}$.
+	
+	Let $w_1$ be the following trace of the program: first, the actions of processes $p_1$, ..., $p_{2N}$ in order (actions writing $y$), then the actions of $p_0$ (with first branch of the \emph{if}). Let $w_2$ another trace, where the actions of $p_0$ come first, and then the actions of processes $p_1$, ..., $p_{2N}$. Evidently, both $w_1$ and $w_2$ are feasible traces from $s_0$ in both abstract state spaces (explored with precision $\Pi_1$ and $\Pi_2$).
+	
+	In the first case, the weak initials $\mathit{WI}_{s_0}^{\Pi_1}(w_1)$ only contains $y := y + 1$ (of $p_1$). To see this, note that no action $\alpha$ of the program is independent in $D_{\Pi_1}$ with all preceding actions of $\alpha$ in $w_1$ due to $y$ being used by the first actions of all threads: it is impossible to consecutively swap adjacent independent elements to obtain another trace $w_1'$ starting with $\alpha$ ($\nexists w_1'$ such that $w_1'$ starts with $\alpha$ and $w_1' \approx^{\Pi_1} w_1$). Similarly, $\mathit{WI}_{s_0}^{\Pi_1}(w_2) = \{z := z+2*y\}$. Since $w_1$ and $w_2$ are both transition sequences from $s_0$, neither $P_1 = \{y := y + 1\}$ nor $P_2 = \{z := z+2*y\}$ is a source set for all transition sequences in $s_0$, since $P_1 \cap \mathit{WI}_{s_0}^{\Pi_1}(w_2) = P_2 \cap \mathit{WI}_{s_0}^{\Pi_1}(w_1) = \emptyset$. In fact, the only source set in $s_0$ is $\mathit{enabled}(s_0)$ itself.
+	
+	In the second case, actions using $y$ are not dependent in $D_{\Pi_2}$. So $\mathit{WI}_{s_0}^{\Pi_2}(w_1)$ and  $\mathit{WI}_{s_0}^{\Pi_2}(w_2)$ both contain all enabled actions in $s_0$ (the first actions of all threads can be swapped with independent swaps). In fact, $\mathit{WI}_{s_0}^{\Pi_2}(w) = \mathit{enabled}(s_0)$ for any trace $w$ starting from $s_0$. Therefore, any action $\alpha \in \mathit{enabled}(s_0)$ forms a source set alone since $\alpha$ is part of the weak initials of all traces starting from $s_0$: e.g., $\{z := z+2*y\}$ is a source set in $s_0$.
+\end{example}
+
+We can use this relaxed definition of source sets to formulate the correctness of abstraction-aware partial order reduction. The goal is to reduce the size of the abstract state space by exploring only a subset of enabled actions from each state. Generally, it is required from such a state space reduction that if an error state can be reached in the original state space, then an error state is also reachable in the reduced state space; this is to ensure that reachability analysis performed in the reduced and the original abstract state space yield equivalent results.
+
+However, in our context of abstraction, it is enough to have an error state in the reduced abstract state space if there is a feasible trace from the initial abstract state to an abstract error state in the original abstract state space. That is, if abstract error states can only be reached with spurious traces (meaning that there is no error state in the concrete state space), there is no need to include an error state in the reduced state space.
+
+\begin{lemma}
+	\label{lemma:por-weak-initials-partial-feasibility}
+	Let $s$ be an abstract state, $\Pi$ be the precision of the abstraction, and $w$ be a trace from $s$ such that $w$ is partially feasible from $s$ for ${vars}(\Pi)$. If $\alpha \in \mathit{WI}_s^\Pi(w)$ and $\alpha \notin w$, then
+	
+	\begin{enumerate}
+		\item $w.\alpha$ is also partially feasible from $s$ for ${vars}(\Pi)$, and
+		\item $\alpha.w \approx^\Pi w.\alpha$.
+	\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+	From \Cref{def:por-weak-initials} of weak initials, there are transition sequences $v_1$ and $v_2$ such that $\alpha.v_1 \approx^\Pi w.v_2$. This means that $w.v_2$ can be obtained from $\alpha.v_1$ by successively swapping adjacent independent actions. Since $\alpha \notin w$, $\alpha \in v_2$ necessarily. Also, for any action $\beta \in v_1$ but $\beta \notin w$, $\beta \in v_2$. Thus, any $\beta \notin w$ (including $\alpha$) preceding any action $\gamma \in w$ in $\alpha.v_1$ must be independent with such $\gamma$ actions: $(\beta, \gamma) \notin D_\Pi$.
+	
+	So we can first move all such $\beta$ after $w$ by successive independent swapping steps without swapping $\alpha$ with any other such $\beta$. Thus, we get the transition sequence $w.\alpha.v_2'$ such that $\alpha.v_1 \approx^\Pi w.\alpha.v_2' \approx^\Pi w.v_2$. Since $w.v_2$ is partially feasible from $s$ based on the definition of weak initials, $w.\alpha.v_2'$ is partially feasible as well by \Cref{theorem:por-partial-feasibility-equivalence}. Thus, its prefix $w.\alpha$ is partially feasible from $s$ which proves the first statement.
+	
+	For the second statement, take again that $(\alpha, \gamma) \notin D_\Pi$ for each $\gamma \in w$ since $\alpha$ precedes every other action in $\alpha.v_1$. This, by definition of the relation $\approx^\Pi$ means that $\alpha.w \approx^\Pi w.\alpha$.
+\end{proof}
+
+Let $W_\Pi(s)$ denote the set of partially feasible traces from an abstract state $s$ for ${vars}(\Pi)$ in an abstract state space with precision $\Pi$. The following theorem (a modified version of the corresponding theorem in \cite{source_persistent}) guarantees the correctness of a partial order reduction algorithm with certain conditions.
+
+\begin{theorem}
+	\label{theorem:por-source-sets}
+	Let $S$ be the original abstract state space built with precision $\Pi$, and $S_R$ be the reduced abstract state space obtained from $S$ by restricting the set of actions that are explored from each state. If the following two conditions are satisfied:
+	
+	\begin{enumerate}
+		\item for each state $s$ in $S_R$, the set of explored actions is a source set for $W_\Pi(s)$ in $s$,
+		\item for each cycle in $S_R$, if an action $\alpha$ is enabled in all states of the cycle, then $\alpha$ is explored from some state of the cycle,
+	\end{enumerate}
+	
+	then for each state $s$ in $S_R$ and abstract trace $w$ from $s$ in $S$ such that $w$ is partially feasible for ${vars}(\Pi)$, there is a transition sequence $w'$ in $S_R$ such that $w \sqsubseteq_{s} w'$.\footnote{Note that $w'$ is not guaranteed to be partially feasible from $s$.}
+\end{theorem}
+
+The proof proceeds similarly to the proof of the original theorem in \cite{source_persistent} though some statements need more thorough justification.
+
+\begin{proof}	
+	I prove the theorem by induction on the length of $w$. The base case with $|w| = 0$ is trivial. For the inductive step, let us have the trace $w \in W_\Pi(s)$: by definition of $W_\Pi(s)$, $w$ is partially feasible from $s$. By condition (1), some action $\alpha \in \mathit{WI}_s^\Pi(w)$ is explored from $s$ in $S_R$. We have two cases:
+	
+	\begin{enumerate}
+		\item $\alpha \in w$
+		
+		By definition, $\alpha \in \mathit{WI}_s^\Pi(w)$ means that $\alpha.(w \backslash \alpha) \approx^\Pi w$ (otherwise, $\alpha.v_1$ could not be transformed into $w.v_2$ by successive independent swapping steps when applying \Cref{def:por-weak-initials} for $\alpha$ and $w$). This implies together with the assumption that $w$ is partially feasible from $s$ that $\alpha.(w \backslash \alpha)$ is also a partially feasible abstract trace from $s$ based on \Cref{theorem:por-partial-feasibility-equivalence}. As a consequence, $(w \backslash \alpha)$ is a partially feasible abstract trace for ${vars}(\Pi)$ from $\alpha(s)$.
+		
+		From the induction hypothesis for state $\alpha(s)$ and the partially feasible trace $(w \backslash \alpha)$ from $\alpha(s)$, we know that the reduced state space $S_R$ contains a trace $w''$ with $(w \backslash \alpha) \sqsubseteq_{\alpha(s)} w''$. This way, $S_R$ also contains the trace $\alpha.w''$ from $s$. We now have that $\alpha.(w \backslash \alpha) \sqsubseteq_{s} \alpha.w''$. From this, along with $\alpha.(w \backslash \alpha) \approx^\Pi w$, we can easily infer from the definitions of $\approx^\Pi$ and $\sqsubseteq_{s}$ that $w \sqsubseteq_{s} \alpha.w''$, so we can take $\alpha.w''$ as $w'$ in the theorem.
+		
+		\item $\alpha \notin w$
+		
+		Let $\alpha_1 = \alpha$. Then, using \Cref{lemma:por-weak-initials-partial-feasibility}, $\alpha_1 \in \mathit{WI}_s^\Pi(w)$, $\alpha_1 \notin w$, and the assumption about the partial feasibility of $w$ imply that $w.\alpha_1$ is a partially feasible trace from $s$, and $\alpha_1.w \approx^\Pi w.\alpha_1$. This, together with \Cref{theorem:por-partial-feasibility-equivalence} implies that $\alpha_1.w$ is also a partially feasible trace from $s$. Thus, $w$ is a partially feasible trace from $\alpha_1(s)$.
+		
+		Again, by condition (1), some action $\alpha_2 \in \mathit{WI}_{\alpha_1(s)}^\Pi(w)$ is explored from $\alpha_1(s)$ in $S_R$. Continuing in this way, we have two cases:
+		
+		\begin{itemize}
+			\item There is a sequence of actions $\alpha_1, ..., \alpha_k$ such that for each $1 \le i \le k - 1$, $w$ is a partially feasible trace from $\alpha_{i-1}(...(\alpha_1(s)))$ with $\alpha_i \notin w$, and $\alpha_k \in w$, and for each $1 \le i \le k$, $\alpha_i \in \mathit{WI}_{\alpha_{i-1}(...(\alpha_1(s)))}^\Pi(w)$. Now, we can extend the reasoning in case 1 of the proof (with $\alpha_k$ being in a similar position as $\alpha$ in case 1): we have a trace $w''$ such that $S_R$ contains the trace $\alpha_1...\alpha_k.w''$ from $s$ such that $\alpha_1...\alpha_k.(w \backslash \alpha_k) \sqsubseteq_{s} \alpha_1...\alpha_k.w''$. Knowing that $\alpha_1...\alpha_k.(w \backslash \alpha_k) \approx^\Pi \alpha_k.(w \backslash \alpha_k).\alpha_1...\alpha_{k-1}$ implies $\alpha_k.(w \backslash \alpha_k) \sqsubseteq_{s} \alpha_1...\alpha_k.w''$. Since $\alpha_k.(w \backslash \alpha_k) \approx^\Pi w$, we have that $w \sqsubseteq_{s} \alpha_1...\alpha_k.w''$, so we can take $\alpha_1...\alpha_k.w''$ as $w'$ in the theorem.
+			
+			\item There is an unbounded sequence of actions $\alpha_1, \alpha_2, ...$ such that for each $i = 1, 2, ...$, $w$ is a partially feasible trace from $\alpha_{i-1}(...(\alpha_1(s)))$, $\alpha_i \notin w$ but $\alpha_i \in \mathit{WI}_{\alpha_{i-1}(...(\alpha_1(s)))}^\Pi(w)$. Consequently, there must be a loop in this unbounded sequence of actions (since the state space if finite) with the first action $w_1$ of $w$ enabled in all states of the loop. By condition (2), $w_1$ must be explored from at least one state of the loop, and we are back in case 1 of the proof.
+		\end{itemize}
+	\end{enumerate}
+\end{proof}
+
+If an error state is reachable in the concrete state space from the initial state with trace $w$, $w$ is also an abstract trace from the abstract initial state $s_0$ leading to an abstract error state, since the abstract state space is an over-approximation of the concrete state space. As $w$ is a feasible trace, it is also partially feasible for any subset of variables. As a consequence, \Cref{theorem:por-source-sets} can be used for $w$: there is an abstract trace $w'$ in the reduced abstract state space with $w \sqsubseteq_{s_0} w'$. Since error locations are sinks in the CFA, any state reachable from an error state is also an error state, so $w'$ also reaches an abstract error state. Note that this $w'$ is not necessarily feasible, only partially feasible for the variables in the precision. However, in such a case, the refinement step of the CEGAR algorithm will realize that $w'$ is not feasible, and it will refine the abstraction.
+
+\section{Static Abstraction-Aware Partial Order Reduction Algorithm}
+\label{sec:aaspor}
+
+Several algorithms have been presented in the literature for partial order reduction \cite{godefroid-thesis,dpor,optimal_dpor}. There are two main approaches: \emph{static} and \emph{dynamic} partial order reduction \cite{principles-of-model-checking}. In the static version, the model (i.e., the CFA of the program) is analyzed, and the reduced state space is generated based on this static analysis. The dynamic approach constructs the reduced state space during the model checking. Although abstraction-aware partial order reduction uses on-the-fly information about the current abstraction, its core partial order reduction algorithm can be implemented in a static fashion.
+
+Though my abstraction-aware extension can be applied to any partial order reduction algorithm, dynamic approaches tend to have much more complex formulations \cite{source_persistent}, so I will restrict myself to the presentation of a static approach in this paper. My static source set-based abstraction-aware partial order reduction algorithm is similar to Overman's algorithm \cite{overman,godefroid-thesis}. Before presenting the algorithm that calculates source sets, the following notions are introduced (similar concepts can be found in \cite{source_persistent}):
+
+\begin{definition}[May-enabled action in a state]
+	An action $\alpha$ is \emph{may-enabled} in a state $s$, if $\alpha \in \mathit{enabled}(s)$ or $\alpha$ can become enabled after a sequence of transitions from processes other than $p_\alpha$.
+\end{definition}
+
+An action $\alpha \notin \mathit{enabled}(s)$ can be \emph{may-enabled} in a state $s$ when the source location of $\alpha$ is $s(p_\alpha)$, but the guard condition of $\alpha$ evaluates to false in $s$.\footnote{If processes can be created or terminated dynamically, actions can be may-enabled in other ways, too; e.g., first actions of processes and join operations.}
+
+\begin{definition}[Future actions]
+	For an $\alpha \in {enabled}(s)$, $\mathit{future\_actions}(s, \alpha)$ is a set of actions: $\beta \in \mathit{future\_actions}(s, \alpha)$ iff there is a transition sequence $w = w_1...w_n$ from $s$, where $w_n = \beta$, and the first action $\beta_0$ of $p_\beta$ in $w$ is either $\alpha$ or $\beta_0 \notin \mathit{enabled}(s)$.
+\end{definition}
+
+The condition on $\beta_0$ in the definition of $\mathit{future\_actions}$ implies that $\beta_0$ is may-enabled in $s$. If $\beta$ is in the same process as $\alpha$, then $\beta_0 = \alpha$. Otherwise, $\beta_0$ is not enabled in $s$.
+
+We can easily compute an over-approximation of $\mathit{future\_actions}(s, \alpha)$ by analyzing the static model of the program. Initially, the actions of process $p_\alpha$ are collected with a graph search of the CFA of $p_\alpha$. An action $\beta \notin {enabled}(s)$ from another process that is may-enabled in $s$ can be enabled by an action $\gamma$ reached in the CFA of $p_\alpha$ (when $\gamma$ writes a variable that $\beta$ uses in its guard condition). Then, $\mathit{future\_actions}(s, \beta)$ is computed recursively to collect more future actions.
+
+With the help of $\mathit{future\_actions}$, we can compute source sets in a state. The current state $s$ and the precision $\Pi$ of the current abstraction are the inputs of \Cref{alg:por-calculate-source-set}. Initially, any enabled action (or practically all enabled actions of a single process) is put in the source set(-to-be) $P$. As long as any new action is added to $P$, the following is repeated: $\mathit{future\_actions}(s, \alpha)$ is calculated for each $\alpha \in {enabled}(s) \setminus P$. If there is any action $\beta \in \mathit{future\_actions}(s, \alpha)$ that is dependent with an action $\gamma \in P$, $\alpha$ is added to $P$.
+
+\begin{algorithm}[t]
+	\caption{Calculating a Source Set from $s$ with $\Pi$}
+	\label{alg:por-calculate-source-set}
+	\DontPrintSemicolon
+	\SetKwComment{Comment}{/* }{ */}
+	\KwIn{$s, \Pi$}
+	\KwOut{$P$ \Comment*[r]{Source set in $s$}}
+	
+	$P \gets \{\alpha\}$ for some $\alpha \in \mathit{enabled}(s)$\;
+	\While{any new item is added to $P$}{
+		$P \gets P \cup \{\alpha \hspace{0.5em} : \hspace{0.5em} \alpha \in \mathit{enabled}(s) \setminus P, \hspace{0.5em} \exists \beta \in \mathit{future\_actions}(s, \alpha), \exists \gamma \in P \text{ with } (\beta, \gamma) \in D_\Pi\}$\;
+	}
+\end{algorithm}
+
+Before proving the correctness of \Cref{alg:por-calculate-source-set}, I note the following property of software. Branches in a program are defined in an if-elseif-else manner, that is the execution can proceed on a branch independent of the variable assignment.
+
+\begin{property}
+	\label{property:por-branch-guards-disjunction}
+	For any location $l$ of a CFA the disjunction of guard conditions of all outgoing actions from $l$ is \emph{true}.\footnote{An action without a guard is technically an action whose guard is \emph{true}.}
+\end{property}
+
+\begin{theorem}
+	A set $P$ returned by \Cref{alg:por-calculate-source-set} for a state $s$ and precision $\Pi$ is a source set in $s$ for $W_\Pi(s)$.
+\end{theorem}
+
+\begin{proof}
+	Let us check the definition of source sets, that is, for each trace from $s$, one of its weak initials is in $P$. Let $w = w_1...w_n \in W_\Pi(s)$ be a partially feasible abstract trace from $s$. We have two cases:
+	
+	\begin{enumerate}
+		\item $\exists w_i \in P$ for some $1 \le i \le n$ (that is $w$ contains an action from $P$). Let $w_f \in P$ be the first occurrence of an element of $P$ in $w$: $w_j \notin P$ for $1 \le j < f$.
+		
+		Then, $(w_j, w_f) \notin D_\Pi$. To see this, assume the opposite: there is a $w_d$ dependent with $w_f$ based on $D_\Pi$, and $d < f$. Since $w_f$ is the first action from $P$ in $w$, $w_d$ can be reached from $s$ with actions from processes that do not have actions in $P$. That is, $w_d \in \mathit{future\_actions}(s, \alpha)$ for some $\alpha \in \mathit{enabled}(s) \setminus P$. In this case, \Cref{alg:por-calculate-source-set} would have added $\alpha$ to $P$ in line 3 (with $w_d$ as $\beta$, $w_f$ as $\gamma$, and $\alpha$ as $\alpha$ using the notation of the algorithm). This did not happen, so our indirect supposition is wrong.
+		
+		Since $w_f$ is independent with all actions preceding $w_f$ in $w$, $w_f.(w \setminus w_f) \approx^\Pi w$ which means by definition that $w_f \in \mathit{WI}_s^\Pi(w)$. So one of the weak initials of $w$ is in $P$, indeed.
+		
+		\item $\nexists w_i \in P$ for $1 \le i \le n$.
+		
+		This supposition implies that all actions in $w$ are independent with all actions in $P$ based on $D_\Pi$. Assume the opposite: there is a $w_d$ for some $1 \le d \le n$, and $\gamma \in P$ such that $(w_d, \gamma) \in D_\Pi$. Reasoning is similar to case 1: since $\nexists w_i \in P$, $w_d \in \mathit{future\_actions}(s, \alpha)$ for some $\alpha \in \mathit{enabled}(s) \setminus P$. Then, \Cref{alg:por-calculate-source-set} would have added $\alpha$ to $P$ which did not happen.
+		
+		Since all actions in $w$ are independent with all actions in $P$, there is at least one $\alpha \in P$ that is a weak initial of $w$. For this, take a partial concretization $c_0,...,c_n$ of $w$ from $s$ ($c_0 \models s$). Take any action $\delta \in P$: if $\delta \in \mathit{enabled}(c_0)$, let $\alpha = \delta$. Otherwise, there is a $\delta' \in \mathit{enabled}(c_0)$ of process $p_\delta$ (starting from the same CFA location as $\delta$) based on \Cref{property:por-branch-guards-disjunction}. Furthermore, $\delta' \in P$ since $(\delta', \delta) \in D_\Pi$ (as they belong to the same process) and $\delta' \in \mathit{future\_actions}(s, \delta')$, so \Cref{alg:por-calculate-source-set} adds $\delta'$ to $P$. As a consequence, $\delta'$ is independent with all actions in $w$. In this case, let $\alpha = \delta'$. Since $\alpha \in \mathit{enabled}(c_0)$, and $(\alpha, w_i) \notin D_\Pi$, we can infer that $\alpha.w \approx^\Pi w.\alpha$, and $w.\alpha$ is partially feasible from $s$ based on \Cref{lemma:por-independence-non-disabling}. This means by definition that $\alpha \in \mathit{WI}_s^\Pi(w)$, indeed. So one of the weak initials of $w$ is in $P$, again.
+	\end{enumerate}
+\end{proof}
+
+\section{Experiments}
+\label{sec:por-experiments}
+
+In this section, I evaluate the efficiency of my algorithmic contributions presented in \Cref{sec:aaspor}. First, I introduce the plans of the experiment in \Cref{sec:por-planning}, along with the research questions I aim to answer in \Cref{sec:por-rq}, and the technical configuration details in \Cref{sec:por-techdetails}. Then, I present and discuss the results of the experiment in \Cref{sec:por-results} with respect to the research questions. Finally, I outline the conclusions of my experiments in \Cref{sec:por-expconclusion}, and discuss the potential threats to their validity in \Cref{sec:por-threats}.
+
+\subsection{Experiment Design}
+\label{sec:por-planning}
+
+The goal of my experiment is to evaluate the performance of the \emph{static abstraction-aware partial order reduction} algorithm presented in \Cref{sec:aaspor}. To facilitate the experimentation, I implemented both a traditional static partial order reduction approach (later \emph{SPOR}), as well as the \emph{abstraction-aware} static partial order reduction technique introduced in this paper (later \emph{AASPOR}). In pursuit of a fair comparison among the algorithms, both implementations are extensions of the \Th~\cite{theta} verification framework, which had prior support for multi-threaded C programs (later \emph{NOPOR})~\cite{theta-tacas2024}. In my experiments, I executed different \emph{configurations} of \Th{} over a set of \emph{input programs} written in C.
+
+\subsubsection{Research Questions}
+\label{sec:por-rq}
+
+To evaluate the presented approach, I aim to answer the following research questions.
+
+\begin{description}
+	\researchquestion{rq:por1}{How does the performance of \emph{AASPOR} compare to \emph{SPOR} over the \emph{explicit} abstract domain?}
+	\researchquestion{rq:por2}{How does the performance of \emph{AASPOR} compare to \emph{SPOR} over the \emph{predicate} abstract domain?}
+	\researchquestion{rq:por3}{How does the practical performance compare to the theoretically exponential gain over the program family introduced in \autoref{fig:por-exponential-motivational-example}?}
+\end{description}
+
+\subsubsection{Experimental Configuration}
+\label{sec:por-techdetails}
+
+I used the subset of the concurrency safety benchmark suite\footnote{\href{https://gitlab.com/sosy-lab/benchmarking/sv-benchmarks/-/commit/2fa025c8cb683e5991b2bbdb057e4cb328700dc0}{gitlab.com/sosy-lab/benchmarking/sv-benchmarks/-/commit/2fa025c8}} of SV-COMP~\cite{svcomp-2023} that is parsable by \textsc{Theta} for \ref{rq:por1}-\ref{rq:por2}, and a direct implementation of \Cref{fig:por-exponential-motivational-example} for \ref{rq:por3} with $N:=2^{0 \le i \le 8}$. The configurations were executed on virtual machines with Intel Core (Haswell) processors, 3 dedicated CPU cores were allocated to each task. Experiments regarding \ref{rq:por3} were executed with 1800 seconds of timeout, while all others used 900 seconds as their time limit. I used a \emph{sequence interpolation}-based refinement strategy with depth-first search and thread-safe large-block encoding~\cite{theta-jar}. For the predicate domain I used \emph{atoms} as the basis of predicate splitting. For the explicit domain I used a maximum number of enumerated successor states (\emph{maxenum}) of $1$ to preserve action-determinism, which is required from the abstract state space.
+
+\subsection{Experimental Results}
+\label{sec:por-results}
+
+\setlength{\tabcolsep}{5pt}
+\begin{table}[t]
+	\centering
+	\begin{tabular}{@{}rrrrr@{}}
+		\multicolumn{1}{c}{\textbf{domain}} & \multicolumn{1}{c}{\textbf{por}} & \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}explored \\ actions\end{tabular}}} & \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}CPU\\ time\end{tabular}}} & \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}solved\\ tasks\end{tabular}}} \\
+		\midrule
+		\multirow{2}{*}{\textbf{EXPL }} & \textbf{SPOR} & 15854 & 5916s & 338 \\
+		& \textbf{AASPOR} & 12963 & 5516s & 344 \\
+		\midrule
+		\multirow{2}{*}{\textbf{PRED }} & \textbf{SPOR} & 11625 & 34982s & 365 \\
+		& \textbf{AASPOR} & 10453 & 33850s & 369 \\
+		\bottomrule
+	\end{tabular}
+	\medskip
+	\caption{Different metrics of the evaluation}
+	\label{table:por-all-results}
+\end{table}
+
+I executed 4 different configurations of \textsc{Theta} on the SV-COMP benchmark suite seen in \Cref{table:por-all-results}. Out of the 605 tasks successfully parsed by \textsc{Theta} and supported by the analysis, a common subset of 334 tasks were successfully solved by the \emph{EXPL} configurations and 357 tasks by the \emph{PRED} configurations within the time limit. No configuration reported any wrong results. \Cref{table:por-all-results} shows the number of successfully solved tasks and the sum of CPU time over the commonly solved tasks per abstract domain, as well as the average explored transition count over the common subsets.
+
+Based on the results, utilization of \emph{AASPOR} as opposed to \emph{SPOR} reduced both the verification time and the number of expanded transitions, and managed to solve more tasks. In both configuration-pairs consisting of an \emph{AASPOR} and a respective \emph{SPOR} configuration, \emph{AASPOR} outperformed the traditional \emph{SPOR} algorithm. While the number of explored transition is significantly reduced, the overall CPU time and the number of solved tasks are only marginally affected.
+
+\begin{description}
+	\item[\ref{rq:por1}] In the \emph{predicate} abstract domain, by using \emph{AASPOR}, the sum of CPU time utilization decreased by $6.77\%$, and the number of expanded transitions by $18.23\%$. The number of solved tasks increased by $6$.
+	\item[\ref{rq:por2}] In the \emph{explicit} abstract domain, by using \emph{AASPOR}, the sum of CPU time utilization decreased by $3.23\%$, and the number of expanded transitions by $10.08\%$.
+\end{description}
+
+In addition, I executed three configurations of \textsc{Theta} on the program family in \autoref{fig:por-exponential-motivational-example}, as seen in \autoref{fig:quantile-por}. I used the \emph{predicate} abstract domain with initial predicates extracted from the program (\emph{allassumes}).
+
+\begin{description}
+	\item[\ref{rq:por3}] While \emph{NOPOR} only solved 2 tasks ($N=1, N=2$) within the time limit, and \emph{SPOR} solved 1 additional task $N=4$, the \emph{AASPOR} configuration solved all 9 configurations, up to $N=256$. Indeed, my abstraction-based POR algorithm scales much better on this task.
+\end{description}
+
+\begin{figure}
+	\centering
+	\input{figures/quantile-por}
+	\caption{Execution time given $i$ for $N:=2^i$ in \Cref{fig:por-exponential-motivational-example}.}
+	\label{fig:quantile-por}
+\end{figure}
+
+\subsection{Evaluation Summary}
+\label{sec:por-expconclusion}
+
+As demonstrated by the data in \Cref{fig:quantile-por}, there are certain scenarios where the utilization of \emph{AASPOR} may lead to vastly improved verification performance (see \ref{rq:por3}). In contrast, in the subset of the benchmark suite of SV-COMP parsable by \Th, this advantage is less pronounced, presumably due to the lack of patterns where an abstraction-based verification algorithm could show its strengths. However, the significantly fewer explored transitions, and the decreased execution time of solved tasks shows that the presented approach is confidently outperforming its baseline (\ref{rq:por1}-\ref{rq:por2}).
+
+\subsection{Threats to Validity}
+\label{sec:por-threats}
+
+The following factors may influence the validity of the experiments.
+
+\emph{Internal Validity.} Consistency and accuracy of the experiments were insured by using the BenchExec framework~\cite{benchexec}. Memory consumption statistics may deviate between executions due to the managed nature of the Java virtual machine, therefore such metrics are not used. CPU time and therefore solved tasks may be influenced by external factors such as other processes or environmental temperature fluctuations, therefore minute differences are disregarded.
+
+\emph{External Validity.} The results of the experiments are at risk of not being generalizable due to the relatively low number of input tasks. As mentioned in \Cref{sec:por-expconclusion}, the lack of certain patterns in the benchmark suite leads to the diminished advantage of the \emph{AASPOR} algorithm. However, the SV-COMP benchmark suite is the \emph{de-facto} standard for academic verification tool development, and immense work would be necessary to extend the suite with further real-life examples.
+
+\emph{Construct Validity.} In order to corroborate that the right metrics are used in the evaluation of the experiments, I considered both the user-facing and the backend-related interactions of the verification tool. The number of solved tasks, and the CPU time necessary for the solution both directly affect the user's ability to verify programs at hand, and the decrease in expanded transitions will influence the number of solver invocations, reducing the load on the entire system. Therefore, these metrics accurately represent the expected outcomes of the executions.
+
+\section{Related Work}
+
+Partial order reduction has been a field of active research in the last decades \cite{valmari_stubborn, godefroid-thesis, peled_10_years_of_por, principles-of-model-checking, dpor, optimal_dpor}. Early POR methods \cite{valmari_stubborn, principles-of-model-checking, godefroid-thesis} approximated the conflicts between actions statically. Later, a depth-first search manner dynamic partial order reduction (DPOR) algorithm was introduced \cite{dpor}, where dependence between actions is decided dynamically during the state space exploration looking at the exploration stack. Source DPOR is a dynamic POR algorithm \cite{optimal_dpor} whose extension, Optimal DPOR \cite{optimal_dpor} is proven to be optimal in the number of explored interleavings. Many optimizations exist for determining dependency where information is retrieved from the state space search context: in these works, actions are considered dependent only in certain states under certain conditions \cite{context_sensitive_por, optimal_dpor_observers, peephole_por}, although these conditions are typically not related to information about the applied abstraction.
+
+Several works use POR in the context of an abstraction-based verification algorithm~\cite{cpachecker-por, impact_por_abstraction, pichecker, hansen_diamonds, abpress, sousa_abstractions_independence, por_abstraction_timed_automata}. However, most of them do not take advantage of using information about the current abstraction in order to increase the reducing effect of POR, whereas this is the key concept of my proposed approach.
+
+\textsc{CPAchecker} is a program verification framework that supports several analysis techniques, including Counterexample-Guided Abstraction Refinement (CEGAR) and POR~\cite{cpachecker-por}. However, the POR algorithm implemented in CPAchecker is relatively simple: only thread-local operations of different threads are considered independent (where an operation is global if it accesses a global memory location and thread-local otherwise). That is, the application of POR is orthogonal to CEGAR in \textsc{CPAchecker}.
+
+In the works of \emph{Su et al.}~\cite{pichecker}, \emph{Kroening et al.}~\cite{abpress} and \emph{Wachter et al.}~\cite{impact_por_abstraction}, the specific abstraction-based verification algorithm \textsc{Impact} is combined with a POR algorithm. Although some of them use conditional dependency, their conditions are similar to the guarded independence relation described by \emph{Wang et al.} \cite{peephole_por}, and they do not exploit information about the applied abstraction to reduce dependency. \emph{Kroening et al.}~\cite{abpress} also discuss the necessary extensions for DPOR algorithms when the abstraction-based algorithm uses \emph{covering}. Covering is applied in abstract state space exploration when an abstract state is reached that is over-approximated by another abstract state reached earlier during the exploration. The exploration stops at these states as all possible behavior is already explored from the other (more general) state. Combining this technique with the depth-first style DPOR algorithms needs extra consideration~\cite{abpress}. \emph{Hansen et al.}~\cite{hansen_diamonds} use POR for the abstraction-based verification of timed automata. Though they use information about the current abstraction, they define relations such that one order of execution simulates the other one. My case is more general: any execution order can be selected for exploration based on my approach and none of the executions have to be the over-approximation of the other.
+
+Several works realize that even the traditional dependency relation is not a valid dependency relation \cite{fbk_por_abstraction, sousa_abstractions_independence}. The combination of POR and abstraction in the work of \emph{Cimatti et al.} \cite{fbk_por_abstraction} is specific to the Explicit Scheduler and Symbolic Threads (ESST) algorithm, while my approach is general. In my general setting, two syntactically independent actions may disable each other in the abstract state space (see \Cref{fig:por-partially-infeasible} in \Cref{example:por-partial-concretization}) whereas they implicitly assume in their proof that such situation cannot happen. \emph{Hansen} \cite{hansen_abstractions_por_nondet} also considers the application of partial order reduction in non-deterministic abstract state spaces. However, the work focuses on the challenges posed by non-determinism, and not the generalization of the commutativity relation.
+
+A central element of my work is the idea of abstract commutativity relations investigated by \emph{Farzan et al.}~\cite{farzan_stratified_commutativity}. They realize that the commutativity relation can also be relaxed in an abstraction-based setting. However, their theoretical analysis focuses on the properties of abstract commutativity relations and their combinations, and they do not embed the commutativity checking in a verification algorithm. On the other hand, my work assumes an abstract state space exploration and a partial order reduction algorithm (this assumption is still a general partial order reduction in a general abstraction-based verification algorithm). Thus, my work faces the challenges and proposes a solution to the application of abstract commutativity in verification algorithms, constituting the main contribution compared to the work of \emph{Farzan et al.}~\cite{farzan_stratified_commutativity}.
+
+
+
+
+\bibliographystyle{splncs04}
+\bibliography{references}
+
+\end{document}

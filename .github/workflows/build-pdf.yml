@@ -1,0 +1,25 @@
+on: [push]
+
+jobs:
+  compile_paper_job:
+    runs-on: ubuntu-latest
+    name: Compile paper
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Build PDFs with the LaTeX engine in Docker
+      uses: ftsrg/document-converter-actions@master
+    - name: Collect results for deployment
+      run: |
+        mkdir out
+        cp paper/paper.pdf out/
+    - name: Create grayscale
+      run: |
+        sudo apt-get install -y ghostscript
+        for i in out/*.pdf; do gs -sOutputFile=${i%.pdf}_grayscale.pdf -sDEVICE=pdfwrite -sColorConversionStrategy=Gray -dProcessColorModel=/DeviceGray -dCompatibilityLevel=1.4 -dNOPAUSE -dBATCH $i; done
+    - name: Deploy 🚀
+      uses: JamesIves/github-pages-deploy-action@ba1486788b0490a235422264426c45848eac35c6  # v4.4.1
+      with:
+        branch: gh-pages
+        folder: out
+        single-commit: true
