@@ -2,7 +2,10 @@
 %
 \input{packages}
 \setcounter{secnumdepth}{4}
+\usepackage{lineno}
 \begin{document}
+% Line numbers for review:
+\linenumbers
 %
 \title{Partial Order Reduction for Abstraction-based Verification of Concurrent Software}
 \titlerunning{Partial Order Reduction for Abstraction-based Verification}
@@ -790,7 +793,7 @@ In this section, we perform an experimental evaluation of the proposed algorithm
 \subsection{Experiment Design}
 \label{sec:por-planning}
 
-The goal of our experiment is to evaluate the effect of using abstraction-aware partial order reduction in the abstract state space and observe the theoretical and practical performance implications of using the proposed approach. Therefore, we implemented different base POR algorithms in different verification tools to obtain results that generalize well for further verification settings. Namely, we implemented the \emph{static partial order reduction} algorithm presented in \Cref{sec:aaspor} (\texttt{SPOR}), and the \emph{Source-DPOR} algorithm of \emph{Abdulla et al.}~(\texttt{DPOR})~\cite{optimal_dpor}. We created an implementation of the static and dynamic version in the verification framework \Th~\cite{theta}, and a proof-of-concept implementation of the static approach in \CPA~\cite{cpachecker}. Each implementation can be used without and with the proposed abstraction-aware extension (the latter being denoted by an \texttt{AA} prefix added to the configuration name).
+The goal of our experiment is to evaluate the effect of using abstraction-aware partial order reduction in the abstract state space and observe the theoretical and practical performance implications of using the proposed approach. Therefore, we implemented different base POR algorithms in different verification tools to obtain results that generalize well for further verification settings. Namely, we implemented the \emph{static partial order reduction} algorithm presented in \Cref{sec:aaspor} (\texttt{SPOR}), and the \emph{Source-DPOR} algorithm of \emph{Abdulla et al.}~(\texttt{DPOR})~\cite{optimal_dpor}. We created an implementation of the static and dynamic version in the verification framework \Th\footnote{\href{https://github.com/ftsrg/theta/commit/c83ee7d53aff91baff79f97818f1320e75e95077}{https://github.com/ftsrg/theta/commit/c83ee7d}}~\cite{theta}, and a proof-of-concept implementation of the static approach in \CPA\footnote{\href{https://gitlab.com/levente.bajczi/cpachecker/-/commit/40936e5158b9a9f92f06e1ad00e1d5ed618b9122}{https://gitlab.com/levente.bajczi/cpachecker/-/commit/40936e51}}~\cite{cpachecker}. Each implementation can be used without and with the proposed abstraction-aware extension (the latter being denoted by an \texttt{AA} prefix added to the configuration name).
 
 To demonstrate that the proposed extension can be applied in different abstract domains, we perform the practical evaluation using two abstract domains: the \emph{explicit value} abstract domain (\texttt{EXPL}) and the \emph{predicate} abstract domain (\texttt{PRED}) introduced in \Cref{sec:abstraction}.
 
@@ -835,33 +838,36 @@ Based on the results, utilization of \emph{AASPOR} as opposed to \emph{SPOR} red
     \setlength{\tabcolsep}{5pt}
     \begin{table}[t]
     	\centering
-    	\begin{tabular}{@{}rrrrrrr@{}}
-    		\multicolumn{1}{c}{\textbf{tool}} & \multicolumn{1}{c}{\textbf{domain}} & \multicolumn{1}{c}{\textbf{por}} & \multicolumn{2}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}explored \\ actions\end{tabular}}} & \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}CPU\\ time\end{tabular}}} & \multicolumn{1}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}solved\\ tasks\end{tabular}}} \\
+    	\begin{tabular}{@{}rrrrlrlrl@{}}
+    		\multicolumn{1}{c}{\textbf{tool}} & \multicolumn{1}{c}{\textbf{domain}} & \multicolumn{1}{c}{\textbf{por}} & \multicolumn{2}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}average explored \\ actions per task\end{tabular}}} & \multicolumn{2}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}total CPU\\ time (s)\end{tabular}}} & \multicolumn{2}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}solved\\ tasks\end{tabular}}} \\
     		\midrule
-    		\multirow{8}{*}{\Th} & \multirow{4}{*}{\texttt{EXPL }} & \texttt{SPOR} & 15854 & 5916s & 330 \\
-    		& & \texttt{AASPOR} & 12963 & ($\downarrow$ 18\%) & 5516s & 340 \\
-    		& & \texttt{DPOR} & 12963 & 5516s & 306 \\
-    		& & \texttt{AADPOR} & 12963 & 5516s & 318 \\
-    		\cmidrule(l){2-6}
-    		& \multirow{4}{*}{\texttt{PRED }} & \texttt{SPOR} & 11625 & 34982s & 371 \\
-    		& & \texttt{AASPOR} & 10453 & 33850s & 373 \\
-    		& & \texttt{DPOR} & 10453 & 33850s & 334 \\
-    		& & \texttt{AADPOR} & 10453 & 33850s & 331 \\
+    		
+    		\multirow[c]{8}{*}{\Th} & \multirow[c]{4}{*}{\texttt{EXPL}} & \texttt{SPOR} & 15929 &  & 4987 &  & 330 &  \\
+    		&  & \texttt{AASPOR} & 13212 & $\downarrow$ -17.06\% & 4709 & $\downarrow$ -5.57\% & 340 & $\uparrow$ 3.03\% \\
+    		&  & \texttt{DPOR} & 17063 &  & 19549 &  & 309 &  \\
+    		&  & \texttt{AADPOR} & 17292 & $\uparrow$ 1.34\% & 18130 & $\downarrow$ -7.26\% & 320 & $\uparrow$ 3.56\% \\
+    		& \multirow[c]{4}{*}{\texttt{PRED}} & \texttt{SPOR} & 12534 &  & 15477 &  & 372 &  \\
+    		&  & \texttt{AASPOR} & 11009 & $\downarrow$ -12.17\% & 15426 & $\downarrow$ -0.33\% & 373 & $\uparrow$ 0.27\% \\
+    		&  & \texttt{DPOR} & 6104 &  & 16129 &  & 335 &  \\
+    		&  & \texttt{AADPOR} & 5883 & $\downarrow$ -3.62\% & 17729 & $\uparrow$ 9.92\% & 332 & $\downarrow$ -0.9\% \\
+    		
             \midrule
-            \multirow{2}{*}{\CPA} & \multirow{2}{*}{\texttt{PRED }} & \texttt{SPOR} & 15854 & 5916s & 240 \\
-    		& & \texttt{AASPOR} & 12963 & 5516s & 241 \\
+            
+            \multirow[c]{2}{*}{\CPA} & \multirow[c]{2}{*}{\texttt{PRED}} & \texttt{SPOR} & 48528 &  & 28381 &  & 241 &  \\
+            &  & \texttt{AASPOR} & 35644 & $\downarrow$ -26.55\% & 27503 & $\downarrow$ -3.09\% & 241 & $\uparrow$ 0.0\% \\
+    		
     		\bottomrule
     	\end{tabular}
     	\medskip
-    	\caption{Results of the evaluation on sv-benchmarks\todo[inline]{Update these!}}
+    	\caption{Results of the evaluation for \ref{rq:sv-benchmarks} on sv-benchmarks}
     	\label{table:sv-benchmarks-results}
     \end{table}
     
 	\item[\ref{rq:exponential}] The experiment results plotted in \Cref{fig:exp-quantile} clearly reveal the great advantage of the abstraction-aware POR configurations over their traditional counterparts. While the \texttt{SPOR} and \texttt{DPOR} configurations using the syntactic dependency relation can solve verify these programs up to $N=4$ within the time limit, the abstraction-aware \texttt{AASPOR} and \texttt{AADPOR} configurations could solve these tasks up to $N=256$. Indeed, the proposed abstraction-aware POR algorithms scale much better on certain programs.
 
-    \begin{figure}
+    \begin{figure}[t]
     	\centering
-    	\input{figures/theta-exp-quantile}
+    	\input{figures/evaluation/theta-exp-quantile}
     	\caption{Execution time for \ref{rq:exponential} given $i$ for $N:=2^i$ in \Cref{fig:por-exponential-motivational-example}.}
     	\label{fig:exp-quantile}
     \end{figure}
