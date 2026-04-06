@@ -1,0 +1,82 @@
+
+\definecolor{ftsrg@AccentPurple}{RGB}{82,43,71}
+\definecolor{ftsrg@AccentOrange}{RGB}{251,139,36}
+\definecolor{ftsrg@AccentGreen}{RGB}{112,173,71}
+
+\pgfplotstableread[col sep=semicolon,read comma as period=true]{data/theta-exp.csv}\datatable
+\begin{minipage}[t]{0.5\textwidth}
+    
+\begin{tikzpicture}[scale=1, every node/.style={transform shape}]
+
+\tikzset{mymark/.style={
+        decoration={
+            markings,
+            mark= between positions 0 and 1 step 5mm with
+                {
+                \pgfuseplotmark{#1};
+            },
+        },
+        postaction={decorate}
+    }
+}
+
+\begin{axis}[
+width=\textwidth,
+height=0.75\textwidth,
+xtick distance={1},
+x tick label style={font=\normalsize, rotate=0, anchor=north},
+legend style={at={(0,1)},anchor=north  west,font=\footnotesize},
+ylabel={Time (s)},
+xlabel={$i$},
+% xlabel={Parameter $i$ for $N:=2^i$ in \autoref{fig:exponential-motivational-example}},
+ymode=log,
+log ticks with fixed point,
+grid=both,
+grid style={gray!20},
+xmin=0,xmax=8,
+ymin=1,ymax=2000,
+every axis plot/.append style={ultra thick}]
+
+% \addplot [ftsrg@AccentPurple, mark=*, mark repeat=1, /pgf/number format/read comma as period=true ] table [x expr=\coordindex, y={SPOR.Exp}]{\datatable};
+% \addlegendentry{NOPOR}
+
+\addplot [ftsrg@AccentOrange, mark=diamond*, mark repeat=1, /pgf/number format/read comma as period=true ] table [x expr=\coordindex, y={SPOR.Exp}]{\datatable};
+\addlegendentry{\texttt{SPOR}}
+
+\addplot [ftsrg@AccentGreen, mark=square*, mark repeat=1, /pgf/number format/read comma as period=true ] table [x expr=\coordindex, y={AASPOR.Exp}]{\datatable};
+\addlegendentry{\texttt{AASPOR}}
+
+\end{axis}
+\end{tikzpicture}
+\end{minipage}%
+\begin{minipage}[t]{0.5\textwidth}
+\begin{tikzpicture}[scale=1, every node/.style={transform shape}]
+\begin{axis}[
+width=\textwidth,
+height=0.75\textwidth,
+xtick distance={1},
+x tick label style={font=\normalsize, rotate=0, anchor=north},
+legend style={at={(0,1)},anchor=north  west,font=\footnotesize},
+ylabel={Time (s)},
+xlabel={$i$},
+% xlabel={Parameter $i$ for $N:=2^i$ in \autoref{fig:exponential-motivational-example}},
+ymode=log,
+log ticks with fixed point,
+grid=both,
+grid style={gray!20},
+xmin=0,xmax=8,
+ymin=1,ymax=2000,
+every axis plot/.append style={ultra thick}]
+
+% \addplot [ftsrg@AccentPurple, mark=*, mark repeat=1, /pgf/number format/read comma as period=true ] table [x expr=\coordindex, y={SPOR.Exp}]{\datatable};
+% \addlegendentry{NOPOR}
+
+\addplot [ftsrg@AccentOrange, mark=diamond*, mark repeat=1, /pgf/number format/read comma as period=true ] table [x expr=\coordindex, y={DPOR.Exp}]{\datatable};
+\addlegendentry{\texttt{DPOR}}
+
+\addplot [ftsrg@AccentGreen, mark=square*, mark repeat=1, /pgf/number format/read comma as period=true ] table [x expr=\coordindex, y={AADPOR.Exp}]{\datatable};
+\addlegendentry{\texttt{AADPOR}}
+
+\end{axis}
+\end{tikzpicture}
+\end{minipage}

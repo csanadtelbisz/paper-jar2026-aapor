@@ -1,9 +1,9 @@
-
 \definecolor{ftsrg@AccentPurple}{RGB}{82,43,71}
 \definecolor{ftsrg@AccentOrange}{RGB}{251,139,36}
 \definecolor{ftsrg@AccentGreen}{RGB}{112,173,71}
 
-\pgfplotstableread[col sep=semicolon,read comma as period=true]{quantile-data-por.csv}\datatable
+\pgfplotstableread[col sep=semicolon,read comma as period=true]{data/theta-svbench.csv}\datatable
+    
 \begin{tikzpicture}[scale=1, every node/.style={transform shape}]
 
 \tikzset{mymark/.style={
@@ -19,29 +19,26 @@
 }
 
 \begin{axis}[
-width=0.65\textwidth,
-height=0.45\textwidth,
-xtick distance={1},
+width=\textwidth,
+height=0.75\textwidth,
+xtick distance={50},
 x tick label style={font=\normalsize, rotate=0, anchor=north},
-legend style={at={(0.97,0.05)},anchor=south east,font=\footnotesize},
+legend style={at={(0,1)},anchor=north  west,font=\footnotesize},
 ylabel={Time (s)},
-xlabel={$i$},
+xlabel={Solved task},
 % xlabel={Parameter $i$ for $N:=2^i$ in \autoref{fig:exponential-motivational-example}},
 ymode=log,
 log ticks with fixed point,
 grid=both,
 grid style={gray!20},
-xmin=0,xmax=8,
-ymin=1,ymax=2000,
+xmin=0,xmax=400,
+ymin=1,ymax=990,
 every axis plot/.append style={ultra thick}]
 
-\addplot [ftsrg@AccentPurple, mark=*, mark repeat=1, /pgf/number format/read comma as period=true ] table [x expr=\coordindex, y={NOPOR}]{\datatable};
-\addlegendentry{NOPOR}
-
-\addplot [ftsrg@AccentOrange, mark=diamond*, mark repeat=1, /pgf/number format/read comma as period=true ] table [x expr=\coordindex, y={SPOR}]{\datatable};
+\addplot [ftsrg@AccentGreen, mark=none, mark repeat=1, /pgf/number format/read comma as period=true ] table [x expr=\coordindex, y={SPOR_EXPL.ConcurrencySafety}]{\datatable};
 \addlegendentry{SPOR}
 
-\addplot [ftsrg@AccentGreen, mark=square*, mark repeat=1, /pgf/number format/read comma as period=true ] table [x expr=\coordindex, y={AASPOR}]{\datatable};
+\addplot [ftsrg@AccentOrange, mark=none, mark repeat=1, /pgf/number format/read comma as period=true ] table [x expr=\coordindex, y={AASPOR_EXPL.ConcurrencySafety}]{\datatable};
 \addlegendentry{AASPOR}
 
 \end{axis}

@@ -34,15 +34,17 @@
 \usepackage{subcaption}
 
 \usepackage[ruled,boxed,resetcount,linesnumbered,vlined]{algorithm2e}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
 \usepackage{xstring}
 \usepackage{cancel}
 
 \usepackage{listings}
 \usepackage{comment}
+\usepackage{todonotes}
 \usepackage{mathtools}
 \usepackage{booktabs}
 \usepackage{multirow}
+\usepackage{array}
 
 \usepackage[most]{tcolorbox}
 \tcbset{on line, 
@@ -72,10 +74,17 @@
 }
 
 \newcommand{\Th}{\textsc{Theta}}
+\newcommand{\CPA}{\textsc{CPAchecker}}
 \newcommand{\rulesep}{\unskip\ \vrule\ }
+
+\usepackage{pifont}
+\newcommand{\cmark}{\ding{51}}
+\newcommand{\xmark}{\ding{55}}
 
 \usepackage{enumitem}
 
+\usepackage{adjustbox}
+\usepackage{tikz}
 \usepackage{pgfplots}
 \usetikzlibrary{patterns}
 \usepackage{pgfplotstable}
