@@ -831,7 +831,101 @@ Based on the results, utilization of \emph{AASPOR} as opposed to \emph{SPOR} red
 \begin{description}
 	\item[\ref{rq:state-space-size}] TODO
 
-    
+	\setlength{\tabcolsep}{2pt}
+    \begin{figure}[t]
+    	\centering
+    	
+    	\begin{subfigure}[b]{0.24\textwidth}
+    		\centering
+    		\includegraphics[width=\textwidth]{figures/evaluation/state-space-relative-size-EXPL-SPOR-vs-AASPOR.pdf}
+			\par\medskip
+			{\scriptsize
+   			\begin{tabular}{@{}rrrrr@{}}
+   				\multicolumn{1}{c}{Q} & \multicolumn{1}{c}{N$_\texttt{AA}$} & \multicolumn{1}{c}{N$_\texttt{B}$} & \multicolumn{1}{c}{r} & \multicolumn{1}{c}{p} \\
+   				\midrule
+   				
+   				% Paste hypothesis test results here
+   				\rowcolor{green!20}
+   				1 & 519 & 316 & -0.62 & 0.00 \\
+   				\rowcolor{green!20}
+   				2 & 298 & 214 & -0.25 & 0.00 \\
+   				\rowcolor{red!20}
+   				3 & 269 & 697 & 0.23 & 1.00 \\
+   				\rowcolor{red!20}
+   				4 & 135 & 313 & -0.10 & 0.02 \\
+   			\end{tabular}
+			}
+    	\end{subfigure}
+    	\hfill
+    	\begin{subfigure}[b]{0.24\textwidth}
+    		\centering
+    		\includegraphics[width=\textwidth]{figures/evaluation/state-space-relative-size-EXPL-DPOR-vs-AADPOR.pdf}
+    		\par\medskip
+    		{\scriptsize
+    			\begin{tabular}{@{}rrrrr@{}}
+    				\multicolumn{1}{c}{Q} & \multicolumn{1}{c}{N$_\texttt{AA}$} & \multicolumn{1}{c}{N$_\texttt{B}$} & \multicolumn{1}{c}{r} & \multicolumn{1}{c}{p} \\
+    				\midrule
+    				
+    				% Paste hypothesis test results here
+    				\rowcolor{green!20}
+    				1 & 422 & 246 & -0.77 & 0.00 \\
+    				\rowcolor{green!20}
+    				2 & 171 & 51 & -0.34 & 0.00 \\
+    				\rowcolor{green!20}
+    				3 & 186 & 83 & -0.24 & 0.00 \\
+    				\rowcolor{red!20}
+    				4 & 111 & 132 & -0.03 & 1.00 \\
+    			\end{tabular}
+    		}
+    	\end{subfigure}
+    	\hfill
+    	\begin{subfigure}[b]{0.24\textwidth}
+    		\centering
+    		\includegraphics[width=\textwidth]{figures/evaluation/state-space-relative-size-PRED-SPOR-vs-AASPOR.pdf}
+    		\par\medskip
+    		{\scriptsize
+    			\begin{tabular}{@{}rrrrr@{}}
+    				\multicolumn{1}{c}{Q} & \multicolumn{1}{c}{N$_\texttt{AA}$} & \multicolumn{1}{c}{N$_\texttt{B}$} & \multicolumn{1}{c}{r} & \multicolumn{1}{c}{p} \\
+    				\midrule
+    				
+    				% Paste hypothesis test results here
+    				\rowcolor{green!20}
+    				1 & 530 & 319 & -0.64 & 0.00 \\
+    				\rowcolor{green!20}
+    				2 & 457 & 173 & -0.16 & 0.00 \\
+    				\rowcolor{red!20}
+    				3 & 244 & 317 & 0.12 & 1.00 \\
+    				\rowcolor{red!20}
+    				4 & 249 & 320 & -0.05 & 0.39 \\
+    			\end{tabular}
+    		}
+    	\end{subfigure}
+    	\hfill
+    	\begin{subfigure}[b]{0.24\textwidth}
+    		\centering
+    		\includegraphics[width=\textwidth]{figures/evaluation/state-space-relative-size-PRED-DPOR-vs-AADPOR.pdf}
+    		\par\medskip
+    		{\scriptsize
+    			\begin{tabular}{@{}rrrrr@{}}
+    				\multicolumn{1}{c}{Q} & \multicolumn{1}{c}{N$_\texttt{AA}$} & \multicolumn{1}{c}{N$_\texttt{B}$} & \multicolumn{1}{c}{r} & \multicolumn{1}{c}{p} \\
+    				\midrule
+    				
+    				% Paste hypothesis test results here
+    				\rowcolor{green!20}
+    				1 & 410 & 254 & -0.79 & 0.00 \\
+    				\rowcolor{green!20}
+    				2 & 244 & 58 & -0.22 & 0.00 \\
+    				\rowcolor{green!20}
+    				3 & 296 & 215 & -0.40 & 0.00 \\
+    				\rowcolor{red!20}
+    				4 & 199 & 218 & -0.04 & 0.68 \\
+    			\end{tabular}
+    		}
+    	\end{subfigure}
+    	
+    	\caption{Size of the explored abstract state space relative to the abstract state space size in the last iteration of the same verification procedure (y) with respect to the level of abstraction, i.e., the ratio of global variables tracked in the precision (x). The tables show the statistical significance testing results: Q is the quartile on the x-axis, N$_\texttt{B}$ is the number of baseline data points, N$_\texttt{AA}$ is the number of data points belonging to the abstraction-aware configuration, $r$ is the effect size revealing the relative difference from the test statistic value expected under the null hypothesis, $p$ is the \emph{p-value} of the test. Quartiles with significant advantage of \texttt{AAPOR} are colored with green, red means no significant advantage of \texttt{AAPOR} compared to the baseline.}
+    	\label{fig:state-space-relative-size}
+    \end{figure}
     
 	\item[\ref{rq:sv-benchmarks}] TODO
 
@@ -844,17 +938,19 @@ Based on the results, utilization of \emph{AASPOR} as opposed to \emph{SPOR} red
     		\multicolumn{1}{c}{\textbf{tool}} & \multicolumn{1}{c}{\textbf{domain}} & \multicolumn{1}{c}{\textbf{por}} & \multicolumn{2}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}average explored \\ actions per task\end{tabular}}} & \multicolumn{2}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}total CPU\\ time (s)\end{tabular}}} & \multicolumn{2}{c}{\textbf{\begin{tabular}[c]{@{}c@{}}solved\\ tasks\end{tabular}}} \\
     		\midrule
     		
-    		\multirow[c]{8}{*}{\Th} & \multirow[c]{4}{*}{\texttt{EXPL}} & \texttt{SPOR} & 15929 &  & 4987 &  & 330 &  \\
-    		&  & \texttt{AASPOR} & 13212 & $\downarrow$ -17.06\% & 4709 & $\downarrow$ -5.57\% & 340 & $\uparrow$ 3.03\% \\
-    		&  & \texttt{DPOR} & 17063 &  & 19549 &  & 309 &  \\
-    		&  & \texttt{AADPOR} & 17292 & $\uparrow$ 1.34\% & 18130 & $\downarrow$ -7.26\% & 320 & $\uparrow$ 3.56\% \\
-    		& \multirow[c]{4}{*}{\texttt{PRED}} & \texttt{SPOR} & 12534 &  & 15477 &  & 372 &  \\
-    		&  & \texttt{AASPOR} & 11009 & $\downarrow$ -12.17\% & 15426 & $\downarrow$ -0.33\% & 373 & $\uparrow$ 0.27\% \\
-    		&  & \texttt{DPOR} & 6104 &  & 16129 &  & 335 &  \\
-    		&  & \texttt{AADPOR} & 5883 & $\downarrow$ -3.62\% & 17729 & $\uparrow$ 9.92\% & 332 & $\downarrow$ -0.9\% \\
+    		% Paste Theta results here
+    		\multirow[c]{8}{*}{\Th} & \multirow[c]{4}{*}{\texttt{EXPL}} & \texttt{SPOR} & 16187 &  & 5214 &  & 337 &  \\
+    		&  & \texttt{AASPOR} & 13461 & $\downarrow$ -16.84\% & 5000 & $\downarrow$ -4.1\% & 347 & $\uparrow$ 2.97\% \\
+    		&  & \texttt{DPOR} & 17072 &  & 20509 &  & 316 &  \\
+    		&  & \texttt{AADPOR} & 16074 & $\downarrow$ -5.85\% & 18122 & $\downarrow$ -11.64\% & 327 & $\uparrow$ 3.48\% \\
+    		& \multirow[c]{4}{*}{\texttt{PRED}} & \texttt{SPOR} & 12534 &  & 15515 &  & 372 &  \\
+    		&  & \texttt{AASPOR} & 11009 & $\downarrow$ -12.17\% & 15543 & $\uparrow$ 0.18\% & 373 & $\uparrow$ 0.27\% \\
+    		&  & \texttt{DPOR} & 6102 &  & 16063 &  & 335 &  \\
+    		&  & \texttt{AADPOR} & 5819 & $\downarrow$ -4.64\% & 16866 & $\uparrow$ 5.0\% & 333 & $\downarrow$ -0.6\% \\
     		
             \midrule
             
+            % Paste CPAchecker results here
             \multirow[c]{2}{*}{\CPA} & \multirow[c]{2}{*}{\texttt{PRED}} & \texttt{SPOR} & 48528 &  & 28381 &  & 241 &  \\
             &  & \texttt{AASPOR} & 35644 & $\downarrow$ -26.55\% & 27503 & $\downarrow$ -3.09\% & 241 & $\uparrow$ 0.0\% \\
     		
